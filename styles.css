@@ -151,6 +151,46 @@ main {
   color: var(--accent);
 }
 
+.daily-header {
+  margin-bottom: 2rem;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.title-row h2 {
+  margin-bottom: 0;
+  line-height: 1.2;
+}
+
+.icon-btn-simple {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-btn-simple:hover {
+  background: #f2e7db;
+  color: var(--accent);
+}
+
+.daily-header .muted {
+  margin-top: 0.5rem;
+}
+
 .ghost-sm {
   border: 1px solid var(--border);
   background: transparent;
