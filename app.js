@@ -336,6 +336,7 @@ const todayDate = document.getElementById("today-date");
 const archiveCount = document.getElementById("archive-count");
 const shareButton = document.getElementById("share-btn");
 const toast = document.getElementById("toast");
+const siteHeader = document.getElementById("site-header");
 
 // Archive View Elements
 const viewArchiveBtn = document.getElementById("view-archive-btn");
@@ -352,6 +353,7 @@ const readerMeta = document.getElementById("reader-meta");
 const readerNote = document.getElementById("reader-note");
 const readerText = document.getElementById("reader-text");
 const readerSource = document.getElementById("reader-source");
+const readerNextNav = document.getElementById("reader-next-nav");
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: "long",
@@ -359,6 +361,12 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
   month: "long",
   day: "numeric",
 });
+
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
 
 const isoDate = (date) => {
   const year = date.getFullYear();
@@ -519,7 +527,7 @@ const createArchiveItem = (entry) => {
   const label = document.createElement("div");
   label.innerHTML = `
     <h4>
-      ${dateFormatter.format(new Date(entry.date))}
+      ${dateFormatter.format(parseLocalDate(entry.date))}
       <span class="status-badge ${status.cls}">${status.label}</span>
     </h4>
     <p class="muted">Poem: ${entry.poem.title} • Story: ${entry.story.title} • Essay: ${entry.essay.title}</p>
@@ -613,6 +621,7 @@ const showReader = (entry, category) => {
   const item = entry[category];
   if (!item) return;
 
+  siteHeader.classList.add("hidden");
   homeView.classList.add("hidden");
   readerView.classList.remove("hidden");
   window.scrollTo(0, 0);
@@ -626,6 +635,60 @@ const showReader = (entry, category) => {
   readerSource.href = item.url;
   
   readerText.innerHTML = item.text ? formatReaderText(item.text) : "<p>Text not available.</p>";
+
+  // Populate Bottom Navigation
+  readerNextNav.innerHTML = "";
+  const categories = ["poem", "story", "essay"];
+  
+  categories.forEach(cat => {
+    if (cat === category) return; // Skip current
+    
+    // Check if item exists and has text (simple check, or just link to it?)
+    // If it's internal text, we can link directly.
+    // If external, we can still show it but it will open external link?
+    // User requested "options like 'poem' 'short story' 'essay'".
+    // We should treat them like the cards do.
+    
+    const catItem = entry[cat];
+    const catLabel = labelMap[cat];
+    if (!catItem) return;
+
+    const btn = document.createElement("button");
+    btn.className = "next-nav-btn";
+    btn.textContent = `Read ${catLabel}`;
+    
+    const hasFullText = catItem.year < 1929 && catItem.text;
+
+    btn.addEventListener("click", () => {
+       if (hasFullText) {
+         // Internal navigation
+         const url = new URL(window.location.href);
+         url.searchParams.set("read", "true");
+         url.searchParams.set("category", cat);
+         window.history.pushState({}, "", url);
+         showReader(entry, cat);
+         window.scrollTo(0, 0);
+       } else {
+         // External link
+         window.open(catItem.url, "_blank");
+         // Also mark as read? Yes, consistency with cards
+         const readHistory = loadReadHistory();
+         readHistory.add(catItem.url);
+         saveReadHistory(readHistory);
+       }
+    });
+    
+    readerNextNav.append(btn);
+  });
+
+  // Home Button
+  const homeBtn = document.createElement("button");
+  homeBtn.className = "next-nav-btn home-btn";
+  homeBtn.textContent = "Home";
+  homeBtn.addEventListener("click", () => {
+     readerBack.click(); // Reuse existing back logic
+  });
+  readerNextNav.append(homeBtn);
 };
 
 const init = () => {
@@ -650,11 +713,12 @@ const init = () => {
     }
   }
 
-  todayDate.textContent = dateFormatter.format(new Date(activeEntry.date));
+  todayDate.textContent = dateFormatter.format(parseLocalDate(activeEntry.date));
 
   if (isReadMode && categoryParam && activeEntry[categoryParam] && activeEntry[categoryParam].text) {
     showReader(activeEntry, categoryParam);
   } else {
+    siteHeader.classList.remove("hidden");
     homeView.classList.remove("hidden");
     readerView.classList.add("hidden");
     renderDaily(activeEntry);
@@ -673,6 +737,7 @@ const init = () => {
     // Keeps date param if it was there
     window.history.pushState({}, "", url);
     
+    siteHeader.classList.remove("hidden");
     homeView.classList.remove("hidden");
     readerView.classList.add("hidden");
     renderDaily(activeEntry);
@@ -685,6 +750,7 @@ const init = () => {
 
   // Archive View Navigation
   viewArchiveBtn.addEventListener("click", () => {
+    siteHeader.classList.add("hidden");
     homeView.classList.add("hidden");
     archiveView.classList.remove("hidden");
     window.scrollTo(0, 0);
@@ -693,6 +759,7 @@ const init = () => {
   archiveBack.addEventListener("click", () => {
     archiveView.classList.add("hidden");
     homeView.classList.remove("hidden");
+    siteHeader.classList.remove("hidden");
     window.scrollTo(0, 0);
   });
 };
