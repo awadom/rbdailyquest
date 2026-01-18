@@ -193,16 +193,18 @@ const ensureTodayEntry = () => {
 };
 
 const buildCard = (label, item) => {
-  const card = document.createElement("article");
+  const card = document.createElement("a");
   card.className = "card";
+  card.href = item.url;
+  card.target = "_blank";
+  card.rel = "noreferrer";
 
   card.innerHTML = `
     <span class="tag">${label}</span>
     <h3>${item.title}</h3>
     <p class="byline">${item.author}</p>
     <p>${item.note}</p>
-    <a href="${item.url}" target="_blank" rel="noreferrer">Read from ${item.source}</a>
-    <span class="source">${item.source}</span>
+    <span class="read-link">Read from ${item.source} &rarr;</span>
   `;
 
   return card;
