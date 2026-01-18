@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RB Daily Quest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:wght@300;400;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="container">
+        <span class="badge">RB Daily Quest</span>
+        <h1>Your daily triad of imagination.</h1>
+        <p class="lead">
+          Each day, discover one poem, one short story, and one essay chosen from
+          legendary open sources. Revisit the archive anytime.
+        </p>
+        <div class="hero-meta">
+          <div>
+            <p class="label">Today</p>
+            <p id="today-date" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Archive size</p>
+            <p id="archive-count" class="value">0</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="daily" aria-live="polite">
+        <div class="section-header">
+          <div>
+            <h2>Today’s Reading Quest</h2>
+            <p class="muted">
+              A fresh combination is locked in each day so your creative library
+              keeps growing.
+            </p>
+          </div>
+          <button id="copy-link" class="ghost">Copy share link</button>
+        </div>
+        <div id="daily-content" class="card-grid"></div>
+      </section>
+
+      <section class="archive">
+        <div class="section-header">
+          <div>
+            <h2>Archive</h2>
+            <p class="muted">Past daily quests you have visited on this device.</p>
+          </div>
+          <button id="export-archive" class="ghost">Export archive</button>
+        </div>
+        <div id="archive-list" class="archive-list"></div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div>
+          <h3>Sources</h3>
+          <ul>
+            <li>Poetry Foundation</li>
+            <li>Poets.org</li>
+            <li>Bartleby</li>
+            <li>Project Gutenberg</li>
+            <li>Aeon</li>
+            <li>American Literature</li>
+            <li>East of the Web</li>
+          </ul>
+        </div>
+        <div>
+          <h3>About</h3>
+          <p>
+            RB Daily Quest is a lightweight reading ritual inspired by Ray
+            Bradbury’s nightly mix of poem, short story, and essay.
+          </p>
+        </div>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
