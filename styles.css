@@ -37,7 +37,7 @@ h3 {
 }
 
 .hero {
-  padding: 4.5rem 0 3rem;
+  padding: 1rem 0 3rem;
   background: radial-gradient(circle at top, #ffffff 0%, #f7efe5 45%, #f4ede2 100%);
   border-bottom: 1px solid var(--border);
 }
@@ -66,25 +66,6 @@ h3 {
   color: var(--muted);
 }
 
-.hero-meta {
-  margin-top: 2rem;
-  display: flex;
-  gap: 2.5rem;
-  flex-wrap: wrap;
-}
-
-.label {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
-
-.value {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-top: 0.25rem;
-}
 
 main {
   padding: 3rem 0 4rem;
@@ -165,6 +146,20 @@ main {
 .title-row h2 {
   margin-bottom: 0;
   line-height: 1.2;
+}
+
+.date-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 0.2rem;
+  margin-bottom: 0.8rem;
+}
+
+.current-date {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--ink);
 }
 
 .icon-btn-simple {
@@ -447,9 +442,6 @@ main {
     margin-right: 1rem;
   }
 
-  .hero-meta {
-    gap: 1.2rem;
-  }
 }
 
 /* Reader View */
@@ -605,10 +597,9 @@ main {
   border: none;
   color: var(--accent);
   padding: 0;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 0.5rem;
   text-decoration: underline;
 }
 

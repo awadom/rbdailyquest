@@ -333,11 +333,11 @@ const dailyContent = document.getElementById("daily-content");
 const dateList = document.getElementById("date-list");
 const fullArchiveList = document.getElementById("full-archive-list");
 const todayDate = document.getElementById("today-date");
-const archiveCount = document.getElementById("archive-count");
+// const archiveCount = document.getElementById("archive-count");
 const shareButton = document.getElementById("share-btn");
 const toast = document.getElementById("toast");
 const siteHeader = document.getElementById("site-header");
-const heroLabel = document.getElementById("hero-label");
+// const heroLabel = document.getElementById("hero-label");
 const dailyHeaderTitle = document.getElementById("daily-header-title");
 const backToTodayBtn = document.getElementById("back-to-today");
 
@@ -502,11 +502,11 @@ const renderDaily = (entry) => {
 
   // Update UI state for Archive vs Today
   if (isToday) {
-     heroLabel.textContent = "Today";
+     // heroLabel removed
      dailyHeaderTitle.textContent = "Today’s Reading Quest";
      backToTodayBtn.classList.add("hidden");
   } else {
-     heroLabel.textContent = "Archived Quest";
+     // heroLabel removed
      dailyHeaderTitle.textContent = "Reading Quest"; // or `Reading Quest: ${entry.date}`
      backToTodayBtn.classList.remove("hidden");
   }
@@ -590,7 +590,6 @@ const updateArchives = (archive) => {
     a.date < b.date ? 1 : -1
   );
 
-  if (archiveCount) archiveCount.textContent = entries.length.toString();
 
   // Render recent (top 3)
   renderArchiveList(entries.slice(0, 3), dateList);
