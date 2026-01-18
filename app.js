@@ -586,9 +586,10 @@ const renderArchiveList = (entries, container) => {
 };
 
 const updateArchives = (archive) => {
-  const entries = Object.values(archive).sort((a, b) =>
-    a.date < b.date ? 1 : -1
-  );
+  const todayKey = isoDate(new Date());
+  const entries = Object.values(archive)
+    .filter(entry => entry.date !== todayKey)
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
 
 
   // Render recent (top 3)
