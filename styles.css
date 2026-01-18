@@ -150,16 +150,28 @@ main {
 
 .card {
   background: var(--surface);
-  padding: 1.6rem;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  text-decoration: none;
-  color: var(--ink);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden; /* Contains the expanding content */
+}
+
+/* Base style for the content wrapper (link or div) */
+.card-front, .card-link-wrapper {
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  color: var(--ink);
+  text-decoration: none;
+  height: 100%;
+}
+
+.card-link-wrapper:hover {
+  text-decoration: none;
 }
 
 .card:hover {
@@ -184,7 +196,8 @@ main {
   font-size: 0.95rem;
 }
 
-.read-link {
+/* Button Styles */
+.read-link, .read-btn, .close-btn {
   margin-top: auto;
   align-self: flex-start;
   font-size: 0.85rem;
@@ -194,24 +207,60 @@ main {
   padding: 0.5rem 1rem;
   border-radius: 999px;
   transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
 }
 
-.read-link.read {
-  background: #e3e8e1; /* Subtle green-ish tint for read state */
+/* Hover effects for buttons/links inside card */
+.card:hover .read-link, 
+.card-front:hover .read-btn {
+  background: var(--accent);
+  color: white;
+  text-decoration: none;
+}
+
+/* Read State */
+.read-link.read, .read-btn.read {
+  background: #e3e8e1;
   color: #4a5c4e;
   border: 1px solid #c8d1c5;
 }
 
-.card:hover .read-link {
-  background: var(--accent);
+.card:hover .read-link.read, 
+.card-front:hover .read-btn.read {
+  background: #5a7060;
   color: white;
-  text-decoration: none;
-  border-color: transparent;
 }
 
-.card:hover .read-link.read {
-  background: #5a7060; /* Darker green on hover for read items */
-  color: white;
+/* Full Text Content Area */
+.card-content {
+  background: #fff;
+  border-top: 1px solid var(--border);
+  padding: 2rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+.card-content.hidden {
+  display: none;
+}
+
+.content-body {
+  font-family: "Literata", serif;
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: #2d2a26;
+  white-space: pre-wrap; /* Preserves poem formatting */
+  max-width: 65ch;
+  margin-bottom: 2rem;
+}
+
+.content-body p {
+  margin-bottom: 1rem;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .archive-list {
@@ -329,4 +378,77 @@ main {
   .hero-meta {
     gap: 1.2rem;
   }
+}
+
+/* Reader View */
+.hidden {
+  display: none !important;
+}
+
+.reader-view {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 2rem 0;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.mb-4 {
+  margin-bottom: 2rem;
+}
+
+.reader-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.reader-header h1 {
+  font-size: 2.5rem;
+  margin: 1rem 0 0.5rem;
+  line-height: 1.2;
+}
+
+.reader-meta {
+  color: var(--muted);
+  font-size: 1.125rem;
+}
+
+.reader-note {
+  margin-top: 1.5rem;
+  font-style: italic;
+  color: var(--accent-strong);
+}
+
+.reader-content .content-body {
+  font-family: "Literata", serif;
+  font-size: 1.25rem;
+  line-height: 1.8;
+  color: var(--ink);
+}
+
+.reader-content .content-body p {
+  margin-bottom: 1.5rem;
+}
+
+.reader-footer {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.reader-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.reader-footer a:hover {
+  text-decoration: underline;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

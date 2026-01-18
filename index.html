@@ -35,31 +35,48 @@
     </header>
 
     <main class="container">
-      <section class="daily" aria-live="polite">
-        <div class="section-header">
-          <div>
-            <h2>Today’s Reading Quest</h2>
-            <p class="muted">
-              A fresh combination is locked in each day so your creative library
-              keeps growing.
-            </p>
+      <div id="home-view">
+        <section class="daily" aria-live="polite">
+          <div class="section-header">
+            <div>
+              <h2>Today’s Reading Quest</h2>
+              <p class="muted">
+                A fresh combination is locked in each day so your creative library
+                keeps growing.
+              </p>
+            </div>
+            <button id="copy-link" class="ghost">Copy share link</button>
           </div>
-          <button id="copy-link" class="ghost">Copy share link</button>
-        </div>
-        <div id="daily-content" class="card-grid"></div>
-      </section>
+          <div id="daily-content" class="card-grid"></div>
+        </section>
 
-      <section class="archive">
-        <div class="section-header">
-          <div>
-            <h2>Archive</h2>
-            <p class="muted">Past daily quests you have visited on this device.</p>
+        <section class="archive">
+          <div class="section-header">
+            <div>
+              <h2>Archive</h2>
+              <p class="muted">Past daily quests you have visited on this device.</p>
+            </div>
+            <button id="export-archive" class="ghost">Export archive</button>
           </div>
-          <button id="export-archive" class="ghost">Export archive</button>
-        </div>
-        <div id="archive-list" class="archive-list"></div>
-      </section>
+          <div id="archive-list" class="archive-list"></div>
+        </section>
+      </div>
 
+      <section id="reader-view" class="reader-view hidden">
+         <button id="reader-back" class="ghost mb-4">&larr; Back to Quest</button>
+         <div class="reader-content">
+           <header class="reader-header">
+             <span id="reader-label" class="tag">Poem</span>
+             <h1 id="reader-title">Title</h1>
+             <p id="reader-meta" class="reader-meta">Author (Year)</p>
+             <p id="reader-note" class="reader-note"></p>
+           </header>
+           <div id="reader-text" class="content-body"></div>
+           <footer class="reader-footer">
+             <p class="muted">Source: <a id="reader-source" href="#" target="_blank" rel="noopener noreferrer">Source</a></p>
+           </footer>
+         </div>
+       </section>
     </main>
 
     <footer class="site-footer">
