@@ -40,8 +40,8 @@ const DATA = {
     {
       title: "Self-Reliance",
       author: "Ralph Waldo Emerson",
-      source: "Bartleby",
-      url: "https://www.bartleby.com/5/113.html",
+      source: "Emerson Central",
+      url: "https://emersoncentral.com/texts/essays-first-series/self-reliance/",
       note: "A foundational call for individual thought.",
     },
     {
@@ -59,18 +59,18 @@ const DATA = {
       note: "A luminous essay on art, space, and freedom.",
     },
     {
-      title: "The Myth of Sisyphus (excerpt)",
-      author: "Albert Camus",
-      source: "Aeon",
-      url: "https://aeon.co/essays/why-sisyphus-represents-the-absurd-hero",
-      note: "An accessible entry into the absurdist mindset.",
+      title: "A Modest Proposal",
+      author: "Jonathan Swift",
+      source: "Project Gutenberg",
+      url: "https://www.gutenberg.org/files/1080/1080-h/1080-h.htm",
+      note: "A satirical masterpiece on rational cruelty.",
     },
     {
-      title: "On Being Ill",
-      author: "Virginia Woolf",
-      source: "Bartleby",
-      url: "https://www.bartleby.com/essay/On-Being-Ill-B9152",
-      note: "An elegiac meditation on the invisible inner life.",
+      title: "Politics and the English Language",
+      author: "George Orwell",
+      source: "The Orwell Foundation",
+      url: "https://www.orwellfoundation.com/the-orwell-foundation/orwell/essays-and-other-works/politics-and-the-english-language/",
+      note: "A defense of clear thinking and clear writing.",
     },
   ],
   stories: [
@@ -112,8 +112,8 @@ const DATA = {
   ],
 };
 
-const STORAGE_KEY = "rb-daily-quest";
-const ARCHIVE_KEY = "rb-daily-quest-archive";
+const STORAGE_KEY = "rb-daily-quest-v2";
+const ARCHIVE_KEY = "rb-daily-quest-archive-v2";
 
 const dailyContent = document.getElementById("daily-content");
 const archiveList = document.getElementById("archive-list");
