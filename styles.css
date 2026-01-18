@@ -393,8 +393,14 @@ main {
 
 @media (max-width: 720px) {
   .section-header {
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
+  }
+  
+  /* Make the text container flex-grow effectively */
+  .section-header > div:first-child {
+    flex: 1;
+    margin-right: 1rem;
   }
 
   .hero-meta {
