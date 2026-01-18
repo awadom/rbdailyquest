@@ -334,7 +334,7 @@ const dateList = document.getElementById("date-list");
 const fullArchiveList = document.getElementById("full-archive-list");
 const todayDate = document.getElementById("today-date");
 const archiveCount = document.getElementById("archive-count");
-const copyLinkButton = document.getElementById("copy-link");
+const shareButton = document.getElementById("share-btn");
 const toast = document.getElementById("toast");
 
 // Archive View Elements
@@ -568,17 +568,39 @@ const updateArchives = (archive) => {
 };
 
 
-const copyShareLink = async (dateKey) => {
+const shareEntry = async (dateKey) => {
   const url = new URL(window.location.href);
   url.searchParams.set("date", dateKey);
   url.searchParams.delete("read");
   url.searchParams.delete("category");
   
+  const shareData = {
+    title: "RB Daily Quest",
+    text: `Daily reading quest for ${dateKey}`,
+    url: url.toString(),
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Share failed', err);
+      }
+      // If user aborted or share failed, fallback to copy not strictly necessary 
+      // but good UX if something weird happened. 
+      // However, usually AbortError means user cancelled.
+      if (err.name === 'AbortError') return;
+    }
+  }
+  
+  // Fallback to clipboard
   try {
     await navigator.clipboard.writeText(url.toString());
     toastMessage("Link copied");
   } catch (error) {
-    toastMessage("Copy failed");
+    toastMessage("Share failed");
   }
 };
 
@@ -635,7 +657,9 @@ const init = () => {
 
   updateArchives(archive);
 
-  copyLinkButton.addEventListener("click", () => copyShareLink(activeEntry.date));
+  if (shareButton) {
+    shareButton.addEventListener("click", () => shareEntry(activeEntry.date));
+  }
   
   readerBack.addEventListener("click", () => {
     const url = new URL(window.location.href);
