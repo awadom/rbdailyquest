@@ -503,11 +503,11 @@ const renderDaily = (entry) => {
   // Update UI state for Archive vs Today
   if (isToday) {
      // heroLabel removed
-     dailyHeaderTitle.textContent = "Today’s Reading Quest";
+     dailyHeaderTitle.textContent = "Today’s Reading";
      backToTodayBtn.classList.add("hidden");
   } else {
      // heroLabel removed
-     dailyHeaderTitle.textContent = "Reading Quest"; // or `Reading Quest: ${entry.date}`
+     dailyHeaderTitle.textContent = "Reading"; // or `Reading Quest: ${entry.date}`
      backToTodayBtn.classList.remove("hidden");
   }
   
