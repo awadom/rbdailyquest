@@ -337,6 +337,9 @@ const archiveCount = document.getElementById("archive-count");
 const shareButton = document.getElementById("share-btn");
 const toast = document.getElementById("toast");
 const siteHeader = document.getElementById("site-header");
+const heroLabel = document.getElementById("hero-label");
+const dailyHeaderTitle = document.getElementById("daily-header-title");
+const backToTodayBtn = document.getElementById("back-to-today");
 
 // Archive View Elements
 const viewArchiveBtn = document.getElementById("view-archive-btn");
@@ -494,6 +497,22 @@ const buildCard = (label, item, dateKey) => {
 };
 
 const renderDaily = (entry) => {
+  const todayKey = isoDate(new Date());
+  const isToday = entry.date === todayKey;
+
+  // Update UI state for Archive vs Today
+  if (isToday) {
+     heroLabel.textContent = "Today";
+     dailyHeaderTitle.textContent = "Today’s Reading Quest";
+     backToTodayBtn.classList.add("hidden");
+  } else {
+     heroLabel.textContent = "Archived Quest";
+     dailyHeaderTitle.textContent = "Reading Quest"; // or `Reading Quest: ${entry.date}`
+     backToTodayBtn.classList.remove("hidden");
+  }
+  
+  todayDate.textContent = dateFormatter.format(parseLocalDate(entry.date));
+  
   dailyContent.innerHTML = "";
   dailyContent.append(
     buildCard("Poem", entry.poem, entry.date),
@@ -713,8 +732,8 @@ const init = () => {
     }
   }
 
-  todayDate.textContent = dateFormatter.format(parseLocalDate(activeEntry.date));
-
+  // todayDate update is now handled in renderDaily
+  
   if (isReadMode && categoryParam && activeEntry[categoryParam] && activeEntry[categoryParam].text) {
     showReader(activeEntry, categoryParam);
   } else {
@@ -730,6 +749,16 @@ const init = () => {
     shareButton.addEventListener("click", () => shareEntry(activeEntry.date));
   }
   
+  backToTodayBtn.addEventListener("click", () => {
+    // Return to today's entry
+    const url = new URL(window.location.href);
+    url.searchParams.delete("date");
+    window.history.pushState({}, "", url);
+    
+    renderDaily(today);
+    toastMessage("Back to today");
+  });
+
   readerBack.addEventListener("click", () => {
     const url = new URL(window.location.href);
     url.searchParams.delete("read");
