@@ -439,23 +439,25 @@ const buildCard = (label, item, dateKey) => {
     : item.url;
 
   card.innerHTML = `
-    <div class="card-front">
+    <a 
+      href="${href}" 
+      class="card-front"
+      ${hasFullText ? "" : 'target="_blank" rel="noopener noreferrer"'}
+    >
       <span class="tag">${label}</span>
       <h3>${item.title}</h3>
       <p class="byline">${item.author} (${item.year})</p>
       <p>${item.note}</p>
-      <a 
-        href="${href}" 
-        class="read-btn ${isRead ? "read" : ""}"
-        ${hasFullText ? "" : 'target="_blank" rel="noopener noreferrer"'}
-      >
+      <span class="read-btn ${isRead ? "read" : ""}">
         ${isRead ? "Read \u2713" : (hasFullText ? "Read Now" : `Read from ${item.source} &rarr;`)}
-      </a>
-    </div>
+      </span>
+    </a>
   `;
 
+  const link = card.querySelector(".card-front");
   const btn = card.querySelector(".read-btn");
-  btn.addEventListener("click", () => {
+
+  link.addEventListener("click", () => {
     if (!readHistory.has(item.url)) {
       readHistory.add(item.url);
       saveReadHistory(readHistory);
