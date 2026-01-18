@@ -114,6 +114,19 @@ const DATA = {
 
 const STORAGE_KEY = "rb-daily-quest-v2";
 const ARCHIVE_KEY = "rb-daily-quest-archive-v2";
+const READ_KEY = "rb-daily-quest-read-history";
+
+const loadReadHistory = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
+const saveReadHistory = (history) => {
+  localStorage.setItem(READ_KEY, JSON.stringify([...history]));
+};
 
 const dailyContent = document.getElementById("daily-content");
 const archiveList = document.getElementById("archive-list");
@@ -199,13 +212,33 @@ const buildCard = (label, item) => {
   card.target = "_blank";
   card.rel = "noreferrer";
 
+  const readHistory = loadReadHistory();
+  const isRead = readHistory.has(item.url);
+
+  // If read, show checkmark. If not, show normal call to action.
+  const buttonText = isRead ? `Read \u2713` : `Read from ${item.source} &rarr;`;
+
   card.innerHTML = `
     <span class="tag">${label}</span>
     <h3>${item.title}</h3>
     <p class="byline">${item.author}</p>
     <p>${item.note}</p>
-    <span class="read-link">Read from ${item.source} &rarr;</span>
+    <span class="read-link ${isRead ? "read" : ""}">${buttonText}</span>
   `;
+
+  card.addEventListener("click", () => {
+    const history = loadReadHistory();
+    if (!history.has(item.url)) {
+      history.add(item.url);
+      saveReadHistory(history);
+
+      const btn = card.querySelector(".read-link");
+      if (btn) {
+        btn.textContent = `Read \u2713`;
+        btn.classList.add("read");
+      }
+    }
+  });
 
   return card;
 };

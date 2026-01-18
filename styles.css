@@ -196,10 +196,22 @@ main {
   transition: all 0.2s ease;
 }
 
+.read-link.read {
+  background: #e3e8e1; /* Subtle green-ish tint for read state */
+  color: #4a5c4e;
+  border: 1px solid #c8d1c5;
+}
+
 .card:hover .read-link {
   background: var(--accent);
   color: white;
   text-decoration: none;
+  border-color: transparent;
+}
+
+.card:hover .read-link.read {
+  background: #5a7060; /* Darker green on hover for read items */
+  color: white;
 }
 
 .archive-list {
