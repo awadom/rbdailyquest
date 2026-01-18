@@ -185,13 +185,21 @@ main {
 }
 
 .read-link {
-  color: var(--accent-strong);
-  font-weight: 600;
   margin-top: auto;
+  align-self: flex-start;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: #f1e3d4;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  transition: all 0.2s ease;
 }
 
 .card:hover .read-link {
-  text-decoration: underline;
+  background: var(--accent);
+  color: white;
+  text-decoration: none;
 }
 
 .archive-list {
