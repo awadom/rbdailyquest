@@ -330,12 +330,17 @@ const saveReadHistory = (history) => {
 };
 
 const dailyContent = document.getElementById("daily-content");
-const archiveList = document.getElementById("archive-list");
+const dateList = document.getElementById("date-list");
+const fullArchiveList = document.getElementById("full-archive-list");
 const todayDate = document.getElementById("today-date");
 const archiveCount = document.getElementById("archive-count");
 const copyLinkButton = document.getElementById("copy-link");
-const exportButton = document.getElementById("export-archive");
 const toast = document.getElementById("toast");
+
+// Archive View Elements
+const viewArchiveBtn = document.getElementById("view-archive-btn");
+const archiveView = document.getElementById("archive-view");
+const archiveBack = document.getElementById("archive-back");
 
 // Reader View Elements
 const homeView = document.getElementById("home-view");
@@ -465,6 +470,9 @@ const buildCard = (label, item, dateKey) => {
          btn.textContent = "Read \u2713";
          btn.classList.add("read");
       }
+      // Refresh archive badges
+      const archive = loadArchive();
+      updateArchives(archive);
     }
     // If it's a reader link, we let the browser handle the navigation (reload with params)
   });
@@ -487,49 +495,76 @@ const toastMessage = (message) => {
   setTimeout(() => toast.classList.remove("show"), 2000);
 };
 
-const renderArchive = (archive) => {
+const getCompletionStatus = (entry) => {
+  const history = loadReadHistory();
+  const urls = [entry.poem.url, entry.story.url, entry.essay.url];
+  const readCount = urls.filter(u => history.has(u)).length;
+  
+  if (readCount === 3) return { label: "Complete", cls: "complete" };
+  if (readCount > 0) return { label: `${readCount}/3 Read`, cls: "partial" };
+  return { label: "Not Started", cls: "none" };
+};
+
+const createArchiveItem = (entry) => {
+  const wrapper = document.createElement("div");
+  wrapper.className = "archive-item";
+
+  const status = getCompletionStatus(entry);
+
+  const label = document.createElement("div");
+  label.innerHTML = `
+    <h4>
+      ${dateFormatter.format(new Date(entry.date))}
+      <span class="status-badge ${status.cls}">${status.label}</span>
+    </h4>
+    <p class="muted">Poem: ${entry.poem.title} • Story: ${entry.story.title} • Essay: ${entry.essay.title}</p>
+  `;
+
+  const button = document.createElement("button");
+  button.textContent = "View";
+  button.addEventListener("click", () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("read");
+    url.searchParams.delete("category");
+    url.searchParams.set("date", entry.date);
+    window.history.pushState({}, "", url);
+    
+    renderDaily(entry);
+    
+    // Switch to Home View
+    archiveView.classList.add("hidden");
+    readerView.classList.add("hidden");
+    homeView.classList.remove("hidden");
+    
+    toastMessage(`Showing ${entry.date}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  wrapper.append(label, button);
+  return wrapper;
+};
+
+const renderArchiveList = (entries, container) => {
+  container.innerHTML = "";
+  if (!entries.length) {
+    container.innerHTML = "<p class=\"muted\">No archive yet.</p>";
+    return;
+  }
+  entries.forEach(entry => container.append(createArchiveItem(entry)));
+};
+
+const updateArchives = (archive) => {
   const entries = Object.values(archive).sort((a, b) =>
     a.date < b.date ? 1 : -1
   );
 
-  archiveCount.textContent = entries.length.toString();
+  if (archiveCount) archiveCount.textContent = entries.length.toString();
 
-  if (!entries.length) {
-    archiveList.innerHTML =
-      "<p class=\"muted\">No archive yet. Visit daily to build your streak.</p>";
-    return;
-  }
-
-  archiveList.innerHTML = "";
-
-  entries.forEach((entry) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "archive-item";
-
-    const label = document.createElement("div");
-    label.innerHTML = `
-      <h4>${dateFormatter.format(new Date(entry.date))}</h4>
-      <p class="muted">Poem: ${entry.poem.title} • Story: ${entry.story.title} • Essay: ${entry.essay.title}</p>
-    `;
-
-    const button = document.createElement("button");
-    button.textContent = "View";
-    button.addEventListener("click", () => {
-      // Clear any read params if they exist (though they shouldn't here)
-      const url = new URL(window.location.href);
-      url.searchParams.delete("read");
-      url.searchParams.delete("category");
-      url.searchParams.set("date", entry.date);
-      window.history.pushState({}, "", url);
-      
-      renderDaily(entry);
-      toastMessage(`Showing ${entry.date}`);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-
-    wrapper.append(label, button);
-    archiveList.append(wrapper);
-  });
+  // Render recent (top 3)
+  renderArchiveList(entries.slice(0, 3), dateList);
+  
+  // Render full
+  renderArchiveList(entries, fullArchiveList);
 };
 
 
@@ -545,18 +580,6 @@ const copyShareLink = async (dateKey) => {
   } catch (error) {
     toastMessage("Copy failed");
   }
-};
-
-const exportArchive = (archive) => {
-  const data = JSON.stringify(archive, null, 2);
-  const blob = new Blob([data], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "rb-daily-quest-archive.json";
-  anchor.click();
-  URL.revokeObjectURL(url);
-  toastMessage("Archive exported");
 };
 
 const showReader = (entry, category) => {
@@ -610,10 +633,9 @@ const init = () => {
     renderDaily(activeEntry);
   }
 
-  renderArchive(archive);
+  updateArchives(archive);
 
   copyLinkButton.addEventListener("click", () => copyShareLink(activeEntry.date));
-  exportButton.addEventListener("click", () => exportArchive(archive));
   
   readerBack.addEventListener("click", () => {
     const url = new URL(window.location.href);
@@ -625,6 +647,23 @@ const init = () => {
     homeView.classList.remove("hidden");
     readerView.classList.add("hidden");
     renderDaily(activeEntry);
+    
+    // Also re-update archives to refresh status badges
+    updateArchives(archive);
+    
+    window.scrollTo(0, 0);
+  });
+
+  // Archive View Navigation
+  viewArchiveBtn.addEventListener("click", () => {
+    homeView.classList.add("hidden");
+    archiveView.classList.remove("hidden");
+    window.scrollTo(0, 0);
+  });
+
+  archiveBack.addEventListener("click", () => {
+    archiveView.classList.add("hidden");
+    homeView.classList.remove("hidden");
     window.scrollTo(0, 0);
   });
 };

@@ -15,7 +15,6 @@
   <body>
     <header class="hero">
       <div class="container">
-        <span class="badge">RB Daily Quest</span>
         <h1>Your daily triad of imagination.</h1>
         <p class="lead">
           Each day, discover one poem, one short story, and one essay chosen from
@@ -54,13 +53,24 @@
           <div class="section-header">
             <div>
               <h2>Archive</h2>
-              <p class="muted">Past daily quests you have visited on this device.</p>
+              <p class="muted">Recent quests you have visited.</p>
             </div>
-            <button id="export-archive" class="ghost">Export archive</button>
+            <button id="view-archive-btn" class="ghost-sm">View all &rarr;</button>
           </div>
-          <div id="archive-list" class="archive-list"></div>
+          <div id="date-list" class="archive-list"></div>
         </section>
       </div>
+
+      <section id="archive-view" class="hidden">
+        <button id="archive-back" class="ghost mb-4">&larr; Back to Home</button>
+        <div class="section-header">
+          <div>
+            <h1>Full Archive</h1>
+            <p class="muted">Track your reading progress across all past days.</p>
+          </div>
+        </div>
+        <div id="full-archive-list" class="archive-list"></div>
+      </section>
 
       <section id="reader-view" class="reader-view hidden">
          <button id="reader-back" class="ghost mb-4">&larr; Back to Quest</button>
