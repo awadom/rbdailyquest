@@ -866,6 +866,44 @@ const ensureTodayEntry = () => {
   return { today: archive[dateKey], archive };
 };
 
+const hydrateEntry = (entry) => {
+  // Returns a new entry object with updated items if available in the loaded library
+  if (!entry) return entry;
+  const newEntry = { ...entry };
+  const typeMap = { poem: 'poems', story: 'stories', essay: 'essays' };
+  
+  // Map for known title upgrades (Local Snippet -> Global Book)
+  // Ensure we use the exact title string found in Firestore
+  const SUPPRESS_MAP = {
+    "Self-Reliance": "Essays — First Series",
+    "Civil Disobedience": "On the Duty of Civil Disobedience",
+    "The Road Not Taken": "Mountain Interval",
+    "The Gift of the Magi": "The Four Million"
+  };
+
+  ['poem', 'story', 'essay'].forEach(key => {
+      const item = entry[key];
+      if (!item) return;
+      
+      const libraryKey = typeMap[key];
+      const list = libraryData[libraryKey];
+      if (!list) return;
+
+      // 1. Direct Title Match
+      let match = list.find(i => i.title === item.title);
+      
+      // 2. Map Match
+      if (!match && SUPPRESS_MAP[item.title]) {
+           match = list.find(i => i.title === SUPPRESS_MAP[item.title]);
+      }
+
+      if (match) {
+          newEntry[key] = match;
+      }
+  });
+  return newEntry;
+};
+
 const formatReaderText = (text) => 
   text.split(/\n\s*\n/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
 
@@ -1140,8 +1178,15 @@ const showReader = (entry, category) => {
 
 const init = async () => {
   await fetchLibrary();
-  const { today, archive } = ensureTodayEntry();
+  let { today, archive } = ensureTodayEntry();
   
+  // Hydrate today's entry with latest/fetched data
+  // This seamlessly upgrades cached local entries to full-text versions
+  today = hydrateEntry(today);
+  // Update the archive with the improved version
+  archive[today.date] = today;
+  saveArchive(archive); // Persist the upgrade
+
   const params = new URLSearchParams(window.location.search);
   const isReadMode = params.get("read") === "true";
   const dateParam = params.get("date");
@@ -1151,12 +1196,12 @@ const init = async () => {
   let activeEntry = today;
   if (dateParam) {
     if (archive[dateParam]) {
-       activeEntry = archive[dateParam];
+       activeEntry = hydrateEntry(archive[dateParam]); // Hydrate past entries too
     } else {
        // Valid date but not in archive? Generate it.
-       // Check if date format is valid YYYY-MM-DD
        if (/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
          activeEntry = createEntry(dateParam);
+         // No need to hydrate newly created entries as they use current libraryData
        }
     }
   }
