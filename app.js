@@ -127,9 +127,155 @@ let currentReadHistory = new Set();
 
 // Initial local load
 try {
-  const local = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
-  local.forEach(url => currentReadHistory.add(url));
-} catch { /* ignore */ }
+// --- AUDIO ENGINE ---
+const synth = window.speechSynthesis;
+let voices = [];
+let currentVoice = null;
+let isPlaying = false;
+let audioQueue = [];
+let queueIndex = 0;
+
+const loadVoices = () => {
+    voices = synth.getVoices();
+    // Prioritize high-quality voices or English
+    const storedVoice = localStorage.getItem('rb-voice-uri');
+    if (storedVoice) {
+        currentVoice = voices.find(v => v.voiceURI === storedVoice);
+    } 
+    
+    if (!currentVoice) {
+       // Prefer Google US English, Samantha, or any EN
+       currentVoice = voices.find(v => v.name.includes('Google US English')) || 
+                      voices.find(v => v.name === 'Samantha') ||
+                      voices.find(v => v.lang.startsWith('en'));
+    }
+    
+    updateVoiceSelect();
+};
+
+if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = loadVoices;
+}
+
+const updateVoiceSelect = () => {
+    const select = document.getElementById("voice-select");
+    if (!select) return;
+    select.innerHTML = "";
+    voices
+      .filter(v => v.lang.startsWith('en')) // Filter for English to keep list clean
+      .forEach(v => {
+        const option = document.createElement("option");
+        option.textContent = `${v.name} (${v.lang})`;
+        option.value = v.voiceURI;
+        if (currentVoice && v.voiceURI === currentVoice.voiceURI) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+};
+
+const stopAudio = () => {
+    synth.cancel();
+    isPlaying = false;
+    audioQueue = [];
+    document.querySelectorAll(".playing").forEach(el => el.classList.remove("playing"));
+    updatePlayIcons();
+};
+
+const updatePlayIcons = () => {
+   const speakBtn = document.getElementById("reader-speak-btn");
+   if (speakBtn) {
+       // If playing this specific text? Hard to track exact item. 
+       // Just toggle icon if general playing state matches
+       speakBtn.innerHTML = isPlaying 
+         ? `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` // Pause/Stop
+         : `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+   }
+   
+   const playAllBtn = document.getElementById("play-all-btn");
+   if (playAllBtn) {
+       playAllBtn.innerHTML = isPlaying
+        ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> Stop Listening`
+        : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Listen to Quest`;
+   }
+};
+
+const playNextInQueue = () => {
+    if (queueIndex >= audioQueue.length) {
+        stopAudio();
+        return;
+    }
+    
+    const item = audioQueue[queueIndex];
+    const utterance = new SpeechSynthesisUtterance(item.text);
+    if (currentVoice) utterance.voice = currentVoice;
+    utterance.rate = 0.9; // Slightly slower for reading
+    
+    utterance.onend = () => {
+        queueIndex++;
+        playNextInQueue();
+    };
+    
+    utterance.onerror = (e) => {
+        console.error("TTS Error", e);
+        stopAudio();
+    };
+    
+    // Announce Title first
+    if (item.title) {
+        const titleUtt = new SpeechSynthesisUtterance(`${item.type}. ${item.title}. By ${item.author}.`);
+        if (currentVoice) titleUtt.voice = currentVoice;
+        titleUtt.onend = () => synth.speak(utterance);
+        synth.speak(titleUtt);
+    } else {
+        synth.speak(utterance);
+    }
+};
+
+const playText = (text, title, author, type) => {
+    stopAudio();
+    isPlaying = true;
+    audioQueue = [{ text, title, author, type }];
+    queueIndex = 0;
+    updatePlayIcons();
+    playNextInQueue();
+};
+
+const playQuest = (entry) => {
+    stopAudio();
+    isPlaying = true;
+    const p = entry.poem;
+    const s = entry.story;
+    const e = entry.essay;
+    
+    // Clean texts
+    const poemText = cleanContent(p.text, p.title, 'poem');
+    // For stories/essays, content might be too long. 
+    // Just read clean versions.
+    let storyText = cleanContent(s.text, s.title, 'story');
+    // Check anthology
+     if (storyText.length > 30000) {
+        const sub = extractRandomStory(storyText, entry.date);
+        if (sub) storyText = sub.text;
+     }
+
+    let essayText = cleanContent(e.text, e.title, 'essay');
+    if (essayText.length > 30000) {
+        const sub = extractRandomStory(essayText, entry.date);
+        if (sub) essayText = sub.text;
+     }
+
+    audioQueue = [
+        { text: poemText, title: p.title, author: p.author, type: "Poem" },
+        { text: storyText, title: s.title, author: s.author, type: "Short Story" },
+        { text: essayText, title: e.title, author: e.author, type: "Essay" }
+    ];
+    queueIndex = 0;
+    updatePlayIcons();
+    toastMessage(`Starting Daily Quest audio...`);
+    playNextInQueue();
+};
+// --- END AUDIO ENGINE ---
 
 // Sync user history (Cloud <-> Local)
 const syncUserHistory = async (user) => {
@@ -702,6 +848,14 @@ const showReader = (entry, category) => {
   readerSource.textContent = item.source || "Source";
   readerSource.href = item.url;
   
+  // Set current global item for audio player
+  window.currentReaderItem = {
+      text: displayText,
+      title: displayTitle,
+      author: item.author,
+      category: labelMap[category] || "Text"
+  };
+  
   // Set content class based on type for CSS styling
   readerText.className = "content-body " + (category === "poem" ? "poem-text" : "prose-text");
   readerText.innerHTML = displayText ? formatReaderText(displayText, category, displayTitle) : "<p>Text not available.</p>";
@@ -974,7 +1128,8 @@ const init = async () => {
               try {
                   const local = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
                   local.forEach(url => currentReadHistory.add(url));
-              } catch {}
+              } catch (e) {}
+
               
               // Force UI refresh
               const archive = loadArchive();
@@ -982,7 +1137,126 @@ const init = async () => {
           }
       });
   }
-};
+// --- END AUTH LISTENERS ---
+
+  // --- AUDIO LISTENERS ---
+  const audioModal = document.getElementById("audio-modal");
+  const audioSettingsBtn = document.getElementById("audio-settings-btn");
+  const closeAudioBtn = document.getElementById("close-audio-btn");
+  const voiceSelect = document.getElementById("voice-select");
+  const playAllBtn = document.getElementById("play-all-btn");
+  const stopAudioBtn = document.getElementById("stop-audio-btn");
+  const readerSpeakBtn = document.getElementById("reader-speak-btn");
+  const readerShareBtn = document.getElementById("reader-share-btn");
+
+  if (audioSettingsBtn) {
+      audioSettingsBtn.addEventListener("click", () => {
+          updateVoiceSelect(); // Refresh list just in case
+          audioModal.showModal();
+      });
+  }
+  
+  if (closeAudioBtn) {
+      closeAudioBtn.addEventListener("click", () => audioModal.close());
+  }
+  
+  if (stopAudioBtn) {
+      stopAudioBtn.addEventListener("click", () => {
+          stopAudio();
+          audioModal.close();
+      });
+  }
+  
+  if (voiceSelect) {
+      voiceSelect.addEventListener("change", (e) => {
+          const selectedURI = e.target.value;
+          currentVoice = voices.find(v => v.voiceURI === selectedURI);
+          if (currentVoice) {
+              localStorage.setItem('rb-voice-uri', currentVoice.voiceURI);
+              // Preview voice
+              stopAudio(); // Stop current
+              const utt = new SpeechSynthesisUtterance("Voice selected.");
+              utt.voice = currentVoice;
+              synth.speak(utt);
+          }
+      });
+  }
+  
+  if (playAllBtn) {
+      // Logic for playing the full day's quest
+      playAllBtn.addEventListener("click", () => {
+          if (isPlaying) {
+              stopAudio();
+          } else {
+              // We need the current active entry.
+              // We can grab it from `hydrateEntry` cache or assume it's `today` if on home screen.
+              // Better: renderDaily attaches the entry to the play button or we access a global `currentRenderedEntry`?
+              // Let's use `ensureTodayEntry().today` if we are on the daily view.
+              // Wait, if the user navigated to an archive day, we want THAT day.
+              // `renderDaily` updates the UI based on an entry.
+              // Let's modify renderDaily to store the current entry in a module-level variable or attached to the DOM.
+              
+              const currentDate = todayDate.textContent; // This is formatted.
+              // Simple hack: We can fetch the entry from archive using the date param in URL or today.
+              
+              const params = new URLSearchParams(window.location.search);
+              const dateParam = params.get("date") || isoDate(new Date());
+              
+              const { archive } = ensureTodayEntry();
+              // Hydrate it to get text
+              let entry = archive[dateParam] || createEntry(dateParam);
+              entry = hydrateEntry(entry);
+              
+              playQuest(entry);
+          }
+      });
+  }
+  
+  if (readerSpeakBtn) {
+      readerSpeakBtn.addEventListener("click", () => {
+          if (isPlaying) {
+              stopAudio();
+          } else {
+              // Grab content from DOM or re-fetch?
+              // Creating a global `currentReaderItem` is cleanest.
+              // See `showReader` below. We will patch it.
+              if (window.currentReaderItem) {
+                  playText(
+                      window.currentReaderItem.text, 
+                      window.currentReaderItem.title, 
+                      window.currentReaderItem.author, 
+                      window.currentReaderItem.category
+                  );
+              }
+          }
+      });
+  }
+
+  if (readerShareBtn) {
+    readerShareBtn.addEventListener("click", () => {
+      const title = document.getElementById("reader-title")?.textContent || "Reading";
+      const meta = document.getElementById("reader-meta")?.textContent || "";
+      const url = window.location.href;
+
+      const shareData = {
+        title: `RB Daily Quest: ${title}`,
+        text: `Reading "${title}" ${meta} on RB Daily Quest`,
+        url: url,
+      };
+
+      if (navigator.share) {
+        navigator.share(shareData).catch((err) => {
+          if (err.name !== "AbortError") console.error("Share failed", err);
+        });
+      } else {
+        navigator.clipboard
+          .writeText(url)
+          .then(() => toastMessage("Link copied"))
+          .catch(() => toastMessage("Share failed"));
+      }
+    });
+  }
+}} catch (e) { console.warn("App initialization error", e); }; // Added catch block to fix try-catch mismatch
 
 const getAuthErrorMessage = (code) => {
     switch (code) {
