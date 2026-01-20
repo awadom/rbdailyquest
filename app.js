@@ -148,9 +148,16 @@ const loadVoices = () => {
     } 
     
     if (!currentVoice) {
-       // Prefer Google US English, Samantha, or any EN
-       currentVoice = voices.find(v => v.name.includes('Google US English')) || 
-                      voices.find(v => v.name === 'Samantha') ||
+       // Enhanced Voice Selection Strategy for Better Quality
+       // 1. Google US English (Chrome) - usually quite good
+       // 2. Microsoft Natural (Edge/Win) - "Natural" in name often implies neural
+       // 3. Samantha (Mac) - classic decent voice
+       // 4. Any English voice
+       
+       currentVoice = voices.find(v => v.name === "Google US English") || 
+                      voices.find(v => v.name.includes("Natural") && v.lang.startsWith("en")) ||
+                      voices.find(v => v.name === "Samantha") ||
+                      voices.find(v => v.lang.startsWith('en-US')) ||
                       voices.find(v => v.lang.startsWith('en'));
     }
     
@@ -198,9 +205,12 @@ const updatePlayIcons = () => {
    
    const playAllBtn = document.getElementById("play-all-btn");
    if (playAllBtn) {
-       playAllBtn.innerHTML = isPlaying
-        ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> Stop Listening`
-        : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Listen to Quest`;
+       const stopIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+       const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+       
+       playAllBtn.innerHTML = isPlaying ? stopIcon : playIcon;
+       playAllBtn.setAttribute('aria-label', isPlaying ? 'Stop Listening' : 'Listen to Quest');
+       playAllBtn.setAttribute('title', isPlaying ? 'Stop Listening' : 'Listen to Quest');
    }
 };
 
