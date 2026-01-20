@@ -185,6 +185,60 @@ const updateVoiceSelect = () => {
     });
 };
 
+const splitTextForTTS = (text) => {
+    // Limits for reliable TTS across browsers (especially Chrome/Safari)
+    // 200-300 chars is a safe sweet spot to avoid timeouts
+    const MAX_CHUNK_LENGTH = 250; 
+    
+    // Quick return if short enough
+    if (text.length <= MAX_CHUNK_LENGTH) return [text];
+
+    const chunks = [];
+    // Split by sentence ending punctuation followed by space or newline
+    // This regex looks for period/exclamation/question mark followed by space/quote/newline
+    const sentenceRegex = /([.?!]["']?)\s+/g;
+    
+    let startIndex = 0;
+    let match;
+    
+    while ((match = sentenceRegex.exec(text)) !== null) {
+        const endIndex = match.index + match[0].length;
+        const chunk = text.substring(startIndex, endIndex);
+        
+        // If adding this sentence exceeds max, push what we have? 
+        // Actually, we want to accumulate sentences until we hit the limit.
+        // But the loop here iterates over *every* sentence.
+        // Let's refine: iterate sentences, accumulate buffer.
+    }
+    
+    // Better simple approach: Split all sentences, then combine.
+    // 1. Split by rough sentence boundaries, keeping delimiters
+    const sentences = text.match(/[^.?!]+[.?!]+["']?|[^.?!]+$/g) || [text];
+    
+    let currentChunk = "";
+    
+    for (const sentence of sentences) {
+        const potential = currentChunk + (currentChunk ? " " : "") + sentence.trim();
+        
+        if (potential.length > MAX_CHUNK_LENGTH) {
+             if (currentChunk) chunks.push(currentChunk);
+             
+             // If the single sentence is huge, forced split or just accept it (usually fine if < 500)
+             if (sentence.length > MAX_CHUNK_LENGTH) {
+                 // Fallback: split by comma or just hard char limit
+                 currentChunk = sentence.trim(); // Just take the hit for now, or implement deeper recursion
+             } else {
+                 currentChunk = sentence.trim();
+             }
+        } else {
+             currentChunk = potential;
+        }
+    }
+    
+    if (currentChunk) chunks.push(currentChunk);
+    return chunks;
+};
+
 const stopAudio = () => {
     synth.cancel();
     isPlaying = false;
@@ -194,6 +248,8 @@ const stopAudio = () => {
 };
 
 const updatePlayIcons = () => {
+   const currentItem = isPlaying && audioQueue.length > queueIndex ? audioQueue[queueIndex] : null;
+
    const speakBtn = document.getElementById("reader-speak-btn");
    if (speakBtn) {
        // If playing this specific text? Hard to track exact item. 
@@ -212,6 +268,22 @@ const updatePlayIcons = () => {
        playAllBtn.setAttribute('aria-label', isPlaying ? 'Stop Listening' : 'Listen to Quest');
        playAllBtn.setAttribute('title', isPlaying ? 'Stop Listening' : 'Listen to Quest');
    }
+
+   // Update Card Buttons
+   document.querySelectorAll(".card-play-btn").forEach(btn => {
+      const btnTitle = btn.dataset.title;
+      // use parentTitle to match reliable identity of the work
+      const isThisPlaying = isPlaying && currentItem && currentItem.parentTitle === btnTitle;
+      
+      const stopIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+      const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+      
+      btn.innerHTML = isThisPlaying ? stopIcon : playIcon;
+      btn.setAttribute('aria-label', isThisPlaying ? 'Stop Listening' : 'Listen');
+      
+      // Visual flair: dim non-playing cards if one IS playing?
+      // Optional enhancement.
+   });
 };
 
 const playNextInQueue = () => {
@@ -219,6 +291,9 @@ const playNextInQueue = () => {
         stopAudio();
         return;
     }
+    
+    // Update UI every time we proceed to a new chunk (essential for cross-story transitions)
+    updatePlayIcons();
     
     const item = audioQueue[queueIndex];
     const utterance = new SpeechSynthesisUtterance(item.text);
@@ -246,10 +321,93 @@ const playNextInQueue = () => {
     }
 };
 
+const skipAudio = (direction) => {
+    // direction: 1 (Next) or -1 (Previous)
+    if (!audioQueue.length) return;
+
+    // Get current item identity
+    const currentItem = audioQueue[queueIndex];
+    if (!currentItem) return;
+    
+    // Find the next/prev distinct work
+    // We look for a change in "parentTitle"
+    
+    let targetIndex = -1;
+    
+    if (direction === 1) {
+        // NEXT: Find first item > queueIndex with diff parentTitle
+        for (let i = queueIndex + 1; i < audioQueue.length; i++) {
+            if (audioQueue[i].parentTitle !== currentItem.parentTitle) {
+                targetIndex = i;
+                break;
+            }
+        }
+        // If not found, we are at the last work. 
+        // Could loop to start? Or just stop? 
+        // Let's just stop if no user preference.
+        if (targetIndex === -1) {
+            stopAudio();
+            return;
+        }
+    } else {
+        // PREV: Complex logic
+        // If we are deep into current work (> 5 chunks in?), restart current work?
+        // Or if we are at start of current work, go to prev work.
+        
+        // Find start of CURRENT work
+        let currentStartIndex = 0;
+        for (let i = queueIndex; i >= 0; i--) {
+            if (audioQueue[i].parentTitle !== currentItem.parentTitle) {
+                currentStartIndex = i + 1;
+                break;
+            }
+        }
+        
+        // If we are significantly past the start, just go to start of current
+        if (queueIndex > currentStartIndex + 2) {
+            targetIndex = currentStartIndex;
+        } else {
+            // Go to start of PREVIOUS work
+            // Find item before currentStartIndex
+             if (currentStartIndex > 0) {
+                 const prevItem = audioQueue[currentStartIndex - 1];
+                 // Now find the start of THAT work
+                 for (let i = currentStartIndex - 1; i >= 0; i--) {
+                     if (audioQueue[i].parentTitle !== prevItem.parentTitle) {
+                         targetIndex = i + 1;
+                         break;
+                     }
+                     if (i === 0) targetIndex = 0; // Reached very beginning
+                 }
+             } else {
+                 targetIndex = 0; // Already at very start
+             }
+        }
+    }
+    
+    if (targetIndex !== -1) {
+        synth.cancel(); // Stop current speaking immediately
+        queueIndex = targetIndex;
+        // Resume
+        playNextInQueue();
+    }
+};
+
+
 const playText = (text, title, author, type) => {
     stopAudio();
     isPlaying = true;
-    audioQueue = [{ text, title, author, type }];
+    
+    const chunks = splitTextForTTS(text);
+    audioQueue = chunks.map((chunk, index) => ({
+        text: chunk,
+        title: index === 0 ? title : null, // Only announce header on first chunk
+        parentTitle: title, // Track identity for all chunks
+        author: author,
+        type: type,
+        isContinuation: index > 0
+    }));
+    
     queueIndex = 0;
     updatePlayIcons();
     playNextInQueue();
@@ -279,11 +437,36 @@ const playQuest = (entry) => {
         if (sub) essayText = sub.text;
      }
 
-    audioQueue = [
-        { text: poemText, title: p.title, author: p.author, type: "Poem" },
-        { text: storyText, title: s.title, author: s.author, type: "Short Story" },
-        { text: essayText, title: e.title, author: e.author, type: "Essay" }
-    ];
+    // Process all into chunks
+    const pChunks = splitTextForTTS(poemText);
+    const sChunks = splitTextForTTS(storyText);
+    const eChunks = splitTextForTTS(essayText);
+    
+    const queuePoem = pChunks.map((c, i) => ({ 
+        text: c, 
+        title: i===0 ? p.title : null, 
+        parentTitle: p.title,
+        author: p.author, 
+        type: "Poem" 
+    }));
+    
+    const queueStory = sChunks.map((c, i) => ({ 
+        text: c, 
+        title: i===0 ? s.title : null, 
+        parentTitle: s.title,
+        author: s.author, 
+        type: "Short Story" 
+    }));
+    
+    const queueEssay = eChunks.map((c, i) => ({ 
+        text: c, 
+        title: i===0 ? e.title : null, 
+        parentTitle: e.title,
+        author: e.author, 
+        type: "Essay" 
+    }));
+
+    audioQueue = [...queuePoem, ...queueStory, ...queueEssay];
     queueIndex = 0;
     updatePlayIcons();
     toastMessage(`Starting Daily Quest audio...`);
@@ -654,25 +837,66 @@ const buildCard = (label, item, dateKey) => {
   const href = hasFullText 
     ? `?read=true&date=${dateKey}&category=${category}`
     : item.url;
-
+  
+  // Create container to hold button for easier layout
   card.innerHTML = `
-    <a 
-      href="${href}" 
-      class="card-front"
-      ${hasFullText ? "" : 'target="_blank" rel="noopener noreferrer"'}
-    >
-      <span class="tag">${label}</span>
-      <h3>${item.title}</h3>
-      <p class="byline">${item.author} (${item.year})</p>
-      <p>${item.note || ""}</p>
-      <span class="read-btn ${isRead ? "read" : ""}">
-        ${isRead ? "Read \u2713" : (hasFullText ? "Read Now" : `Read from ${item.source} &rarr;`)}
-      </span>
-    </a>
+    <div style="position: relative; height: 100%;">
+        <a 
+        href="${href}" 
+        class="card-front"
+        ${hasFullText ? "" : 'target="_blank" rel="noopener noreferrer"'}
+        >
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <span class="tag">${label}</span>
+        </div>
+        
+        <h3>${item.title}</h3>
+        <p class="byline">${item.author} (${item.year})</p>
+        <p>${item.note || ""}</p>
+        <span class="read-btn ${isRead ? "read" : ""}">
+            ${isRead ? "Read \u2713" : (hasFullText ? "Read Now" : `Read from ${item.source} &rarr;`)}
+        </span>
+        </a>
+        
+        ${hasFullText && item.text ? `
+        <button class="icon-btn-simple card-play-btn" 
+            data-title="${item.title}"
+            aria-label="Listen to ${item.title}" 
+            title="Listen" 
+            style="position: absolute; top: 1.25rem; right: 1.25rem; z-index: 10;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+        </button>
+        ` : ''}
+    </div>
   `;
 
   const link = card.querySelector(".card-front");
-  const btn = card.querySelector(".read-btn");
+  const playBtn = card.querySelector(".card-play-btn");
+  const btn = link.querySelector(".read-btn"); // btn is inside link now
+
+  if (playBtn) {
+      playBtn.addEventListener("click", (e) => {
+          e.stopPropagation(); // Don't trigger card link
+          e.preventDefault();
+          
+          if (isPlaying && audioQueue.length > 0 && audioQueue[0].title === item.title) {
+              stopAudio();
+          } else {
+              playText(item.text, item.title, item.author, label);
+          }
+      });
+  }
+
+  // Handle navigation click separately since button is outside anchor tag logically in some browsers if improper,
+  // but here it is sibling. The issue with `card.innerHTML` rewrite is that it changes the structure expected by styles?
+  // Check `card-front` styles. It expects to be direct child of `card`?
+  // `.card-front` has `padding: 1.6rem`.
+  // Since I wrapped it in a div, `card > .card-front` selector might fail if it exists.
+  // Viewing styles.css: `.card-front` is a class selector, not child selector.
+  // `.card` has flex column.
+  // My wrapper div needs `height: 100%; display: flex; flex-direction: column;` to match?
+  // No, `card-front` has `height: 100%`.
+  // The wrapper div `height: 100%` should propagate.
 
   link.addEventListener("click", () => {
     if (!readHistory.has(item.url)) {
@@ -708,6 +932,15 @@ const renderDaily = (entry) => {
   }
   
   todayDate.textContent = dateFormatter.format(parseLocalDate(entry.date));
+  
+  // Ensure audio controls are visible if we have content
+  const playAllBtn = document.getElementById("play-all-btn");
+  const prevBtn = document.getElementById("prev-btn");
+  const nextBtn = document.getElementById("next-btn");
+  
+  if (playAllBtn) playAllBtn.classList.remove("hidden");
+  if (prevBtn) prevBtn.classList.remove("hidden");
+  if (nextBtn) nextBtn.classList.remove("hidden");
   
   dailyContent.innerHTML = "";
   dailyContent.append(
@@ -1194,6 +1427,17 @@ const init = async () => {
               synth.speak(utt);
           }
       });
+  }
+  
+  const prevBtn = document.getElementById("prev-btn");
+  const nextBtn = document.getElementById("next-btn");
+
+  if (prevBtn) {
+    prevBtn.addEventListener("click", () => skipAudio(-1));
+  }
+  
+  if (nextBtn) {
+    nextBtn.addEventListener("click", () => skipAudio(1));
   }
   
   if (playAllBtn) {
