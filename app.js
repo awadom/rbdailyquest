@@ -1,4 +1,29 @@
-const DATA = {
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// TODO: Replace with your actual Firebase project configuration
+// Get this from: Firebase Console -> Project Overview -> Project Settings -> General -> "Your apps"
+const firebaseConfig = {
+  apiKey: "AIzaSyBrkLTZJfV-y2FH-BzBBt64yomwV3DujPU",
+  authDomain: "rbdailyquest.firebaseapp.com",
+  projectId: "rbdailyquest",
+  storageBucket: "rbdailyquest.firebasestorage.app",
+  messagingSenderId: "280210832999",
+  appId: "1:280210832999:web:82779265df794348865ec2",
+  measurementId: "G-0XD5RWD1GT"
+};
+
+// Initialize Firebase
+// Note: Errors here are caught in init() to fallback to local data if config is missing
+let db;
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+} catch (e) {
+  console.warn("Firebase not configured. Using local fallback data.");
+}
+
+const LOCAL_DATA = {
   poems: [
     {
       title: "The Road Not Taken",
@@ -35,9 +60,172 @@ And that has made all the difference.`
       title: "The Love Song of J. Alfred Prufrock",
       author: "T. S. Eliot",
       year: 1915,
-      source: "Poetry Foundation",
-      url: "https://www.poetryfoundation.org/poems/44212/the-love-song-of-j-alfred-prufrock",
+      source: "Poets.org",
+      url: "https://poets.org/poem/love-song-j-alfred-prufrock",
       note: "Modernist uncertainty and longing in brilliant cadence.",
+      text: `S’io credesse che mia risposta fosse
+A persona che mai tornasse al mondo,
+Questa fiamma staria senza piu scosse.
+Ma perciocche giammai di questo fondo
+Non torno vivo alcun, s’i’odo il vero,
+Senza tema d'infamia ti rispondo.
+
+Let us go then, you and I,
+When the evening is spread out against the sky
+Like a patient etherized upon a table;
+Let us go, through certain half-deserted streets,
+The muttering retreats
+Of restless nights in one-night cheap hotels
+And sawdust restaurants with oyster-shells:
+Streets that follow like a tedious argument
+Of insidious intent
+To lead you to an overwhelming question …
+Oh, do not ask, “What is it?”
+Let us go and make our visit.
+
+In the room the women come and go
+Talking of Michelangelo.
+
+The yellow fog that rubs its back upon the window-panes,
+The yellow smoke that rubs its muzzle on the window-panes
+Licked its tongue into the corners of the evening,
+Lingered upon the pools that stand in drains,
+Let fall upon its back the soot that falls from chimneys,
+Slipped by the terrace, made a sudden leap,
+And seeing that it was a soft October night,
+Curled once about the house, and fell asleep.
+
+And indeed there will be time
+For the yellow smoke that slides along the street,
+Rubbing its back upon the window-panes;
+There will be time, there will be time
+To prepare a face to meet the faces that you meet;
+There will be time to murder and create,
+And time for all the works and days of hands
+That lift and drop a question on your plate;
+Time for you and time for me,
+And time yet for a hundred indecisions,
+And for a hundred visions and revisions,
+Before the taking of a toast and tea.
+
+In the room the women come and go
+Talking of Michelangelo.
+
+And indeed there will be time
+To wonder, “Do I dare?” and, “Do I dare?”
+Time to turn back and descend the stair,
+With a bald spot in the middle of my hair—
+[They will say: “How his hair is growing thin!”]
+My morning coat, my collar mounting firmly to the chin,
+My necktie rich and modest, but asserted by a simple pin—
+[They will say: “But how his arms and legs are thin!”]
+Do I dare
+Disturb the universe?
+In a minute there is time
+For decisions and revisions which a minute will reverse.
+
+For I have known them all already, known them all—
+Have known the evenings, mornings, afternoons,
+I have measured out my life with coffee spoons;
+I know the voices dying with a dying fall
+Beneath the music from a farther room.
+     So how should I presume?
+
+And I have known the eyes already, known them all—
+The eyes that fix you in a formulated phrase,
+And when I am formulated, sprawling on a pin,
+When I am pinned and wriggling on the wall,
+Then how should I begin
+To spit out all the butt-ends of my days and ways?
+     And how should I presume?
+
+And I have known the arms already, known them all—
+Arms that are braceleted and white and bare
+[But in the lamplight, downed with light brown hair!]
+Is it perfume from a dress
+That makes me so digress?
+Arms that lie along a table, or wrap about a shawl.
+     And should I then presume?
+     And how should I begin?
+
+. . . . .
+
+Shall I say, I have gone at dusk through narrow streets
+And watched the smoke that rises from the pipes
+Of lonely men in shirt-sleeves, leaning out of windows? …
+
+I should have been a pair of ragged claws
+Scuttling across the floors of silent seas.
+
+. . . . .
+
+And the afternoon, the evening, sleeps so peacefully!
+Smoothed by long fingers,
+Asleep … tired … or it malingers,
+Stretched on the floor, here beside you and me.
+Should I, after tea and cakes and ices,
+Have the strength to force the moment to its crisis?
+But though I have wept and fasted, wept and prayed,
+Though I have seen my head [grown slightly bald] brought in upon a platter,
+I am no prophet—and here’s no great matter;
+I have seen the moment of my greatness flicker,
+And I have seen the eternal Footman hold my coat, and snicker,
+And in short, I was afraid.
+
+And would it have been worth it, after all,
+After the cups, the marmalade, the tea,
+Among the porcelain, among some talk of you and me,
+Would it have been worth while,
+To have bitten off the matter with a smile,
+To have squeezed the universe into a ball
+To roll it toward some overwhelming question,
+To say: “I am Lazarus, come from the dead,
+Come back to tell you all, I shall tell you all”—
+If one, settling a pillow by her head,
+     Should say: “That is not what I meant at all.
+     That is not it, at all.”
+
+And would it have been worth it, after all,
+Would it have been worth while,
+After the sunsets and the dooryards and the sprinkled streets,
+After the novels, after the teacups, after the skirts that trail along the floor—
+And this, and so much more?—
+It is impossible to say just what I mean!
+But as if a magic lantern threw the nerves in patterns on a screen:
+Would it have been worth while
+If one, settling a pillow or throwing off a shawl,
+And turning toward the window, should say:
+     “That is not it at all,
+     That is not what I meant, at all.”
+
+. . . . .
+
+No! I am not Prince Hamlet, nor was meant to be;
+Am an attendant lord, one that will do
+To swell a progress, start a scene or two,
+Advise the prince; no doubt, an easy tool,
+Deferential, glad to be of use,
+Politic, cautious, and meticulous;
+Full of high sentence, but a bit obtuse;
+At times, indeed, almost ridiculous—
+Almost, at times, the Fool.
+
+I grow old … I grow old …
+I shall wear the bottoms of my trousers rolled.
+
+Shall I part my hair behind? Do I dare to eat a peach?
+I shall wear white flannel trousers, and walk upon the beach.
+I have heard the mermaids singing, each to each.
+
+I do not think that they will sing to me.
+
+I have seen them riding seaward on the waves
+Combing the white hair of the waves blown back
+When the wind blows the water white and black.
+
+We have lingered in the chambers of the sea
+By sea-girls wreathed with seaweed red and brown
+Till human voices wake us, and we drown.`
     },
     {
       title: "If—",
@@ -46,6 +234,41 @@ And that has made all the difference.`
       source: "Poets.org",
       url: "https://poets.org/poem/if",
       note: "A timeless poem of resolve and resilience.",
+      text: `If you can keep your head when all about you
+   Are losing theirs and blaming it on you;
+If you can trust yourself when all men doubt you,
+   But make allowance for their doubting too;
+If you can wait and not be tired by waiting,
+   Or, being lied about, don’t deal in lies,
+Or, being hated, don’t give way to hating,
+   And yet don’t look too good, nor talk too wise;
+
+If you can dream—and not make dreams your master;
+   If you can think—and not make thoughts your aim;
+If you can meet with triumph and disaster
+   And treat those two impostors just the same;
+If you can bear to hear the truth you’ve spoken
+   Twisted by knaves to make a trap for fools,
+Or watch the things you gave your life to broken,
+   And stoop and build ’em up with wornout tools;
+
+If you can make one heap of all your winnings
+   And risk it on one turn of pitch-and-toss,
+And lose, and start again at your beginnings
+   And never breathe a word about your loss;
+If you can force your heart and nerve and sinew
+   To serve your turn long after they are gone,
+And so hold on when there is nothing in you
+   Except the Will which says to them: “Hold on”;
+
+If you can talk with crowds and keep your virtue,
+   Or walk with kings—nor lose the common touch;
+If neither foes nor loving friends can hurt you;
+   If all men count with you, but none too much;
+If you can fill the unforgiving minute
+   With sixty seconds’ worth of distance run—
+   Yours is the Earth and everything that’s in it,
+And—which is more—you’ll be a Man, my son!`
     },
     {
       title: "Because I could not stop for Death",
@@ -54,6 +277,35 @@ And that has made all the difference.`
       source: "Poets.org",
       url: "https://poets.org/poem/because-i-could-not-stop-death-479",
       note: "An unforgettable ride with eternity.",
+      text: `Because I could not stop for Death—
+He kindly stopped for me—
+The Carriage held but just Ourselves—
+And Immortality.
+
+We slowly drove— He knew no haste
+And I had put away
+My labor and my leisure too,
+For His Civility—
+
+We passed the School, where Children strove
+At Recess— in the Ring—
+We passed the Fields of Gazing Grain—
+We passed the Setting Sun—
+
+Or rather— He passed us—
+The Dews drew quivering and chill—
+For only Gossamer, my Gown—
+My Tippet— only Tulle—
+
+We paused before a House that seemed
+A Swelling of the Ground—
+The Roof was scarcely visible—
+The Cornice— in the Ground—
+
+Since then— ’tis Centuries— and yet
+Feels shorter than the Day
+I first surmised the Horses’ Heads
+Were toward Eternity—`
     },
     {
       title: "Ode to a Nightingale",
@@ -62,6 +314,101 @@ And that has made all the difference.`
       source: "Poetry Foundation",
       url: "https://www.poetryfoundation.org/poems/44479/ode-to-a-nightingale",
       note: "An ode to beauty, impermanence, and escape.",
+      text: `1.
+My heart aches, and a drowsy numbness pains
+    My sense, as though of hemlock I had drunk,
+Or emptied some dull opiate to the drains
+    One minute past, and Lethe-wards had sunk:
+'Tis not through envy of thy happy lot,
+    But being too happy in thine happiness,—
+        That thou, light-winged Dryad of the trees,
+                In some melodious plot
+    Of beechen green, and shadows numberless,
+        Singest of summer in full-throated ease.
+
+2.
+O, for a draught of vintage! that hath been
+    Cool'd a long age in the deep-delved earth,
+Tasting of Flora and the country green,
+    Dance, and Provençal song, and sunburnt mirth!
+O for a beaker full of the warm South,
+    Full of the true, the blushful Hippocrene,
+        With beaded bubbles winking at the brim,
+                And purple-stained mouth;
+    That I might drink, and leave the world unseen,
+        And with thee fade away into the forest dim:
+
+3.
+Fade far away, dissolve, and quite forget
+    What thou among the leaves hast never known,
+The weariness, the fever, and the fret
+    Here, where men sit and hear each other groan;
+Where palsy shakes a few, sad, last gray hairs,
+    Where youth grows pale, and spectre-thin, and dies;
+        Where but to think is to be full of sorrow
+                And leaden-eyed despairs,
+    Where Beauty cannot keep her lustrous eyes,
+        Or new Love pine at them beyond to-morrow.
+
+4.
+Away! away! for I will fly to thee,
+    Not charioted by Bacchus and his pards,
+But on the viewless wings of Poesy,
+    Though the dull brain perplexes and retards:
+Already with thee! tender is the night,
+    And haply the Queen-Moon is on her throne,
+        Cluster'd around by all her starry Fays;
+                But here there is no light,
+    Save what from heaven is with the breezes blown
+        Through verdurous glooms and winding mossy ways.
+
+5.
+I cannot see what flowers are at my feet,
+    Nor what soft incense hangs upon the boughs,
+But, in embalmed darkness, guess each sweet
+    Wherewith the seasonable month endows
+The grass, the thicket, and the fruit-tree wild;
+    White hawthorn, and the pastoral eglantine;
+        Fast fading violets cover'd up in leaves;
+                And mid-May's eldest child,
+    The coming musk-rose, full of dewy wine,
+        The murmurous haunt of flies on summer eves.
+
+6.
+Darkling I listen; and, for many a time
+    I have been half in love with easeful Death,
+Call'd him soft names in many a mused rhyme,
+    To take into the air my quiet breath;
+Now more than ever seems it rich to die,
+    To cease upon the midnight with no pain,
+        While thou art pouring forth thy soul abroad
+                In such an ecstasy!
+    Still wouldst thou sing, and I have ears in vain—
+        To thy high requiem become a sod.
+
+7.
+Thou wast not born for death, immortal Bird!
+    No hungry generations tread thee down;
+The voice I hear this passing night was heard
+    In ancient days by emperor and clown:
+Perhaps the self-same song that found a path
+    Through the sad heart of Ruth, when, sick for home,
+        She stood in tears amid the alien corn;
+                The same that oft-times hath
+    Charm'd magic casements, opening on the foam
+        Of perilous seas, in faery lands forlorn.
+
+8.
+Forlorn! the very word is like a bell
+    To toll me back from thee to my sole self!
+Adieu! the fancy cannot cheat so well
+    As she is fam'd to do, deceiving elf.
+Adieu! adieu! thy plaintive anthem fades
+    Past the near meadows, over the still stream,
+        Up the hill-side; and now 'tis buried deep
+                In the next valley-glades:
+    Was it a vision, or a waking dream?
+        Fled is that music:—Do I wake or sleep?`
     },
   ],
   essays: [
@@ -96,6 +443,29 @@ And that has made all the difference.`
       source: "Project Gutenberg",
       url: "https://www.gutenberg.org/files/1080/1080-h/1080-h.htm",
       note: "A satirical masterpiece on rational cruelty.",
+      text: `It is a melancholy object to those, who walk through this great town, or travel in the country, when they see the streets, the roads, and cabbin-doors crowded with beggars of the female sex, followed by three, four, or six children, all in rags, and importuning every passenger for an alms.
+
+I think it is agreed by all parties, that this prodigious number of children in the arms, or on the backs, or at the heels of their mothers, and frequently of their fathers, is in the present deplorable state of the kingdom, a very great additional grievance; and therefore whoever could find out a fair, cheap and easy method of making these children sound and useful members of the commonwealth, would deserve so well of the publick, as to have his statue set up for a preserver of the nation.
+
+But my intention is very far from being confined to provide only for the children of professed beggars: it is of a much greater extent, and shall take in the whole number of infants at a certain age, who are born of parents in effect as little able to support them, as those who demand our charity in the streets.
+
+As to my own part, having turned my thoughts for many years upon this important subject, and maturely weighed the several schemes of our projectors, I have always found them grossly mistaken in their computation. It is true, a child just dropt from its dam, may be supported by her milk, for a solar year, with little other nourishment: at most not above the value of two shillings, which the mother may certainly get, or the value in scraps, by her lawful occupation of begging; and it is exactly at one year old that I propose to provide for them in such a manner, as, instead of being a charge upon their parents, or the parish, or wanting food and raiment for the rest of their lives, they shall, on the contrary, contribute to the feeding, and partly to the clothing of many thousands.
+
+I shall now therefore humbly propose my own thoughts, which I hope will not be liable to the least objection.
+
+I have been assured by a very knowing American of my acquaintance in London, that a young healthy child well nursed, is, at a year old, a most delicious nourishing and wholesome food, whether stewed, roasted, baked, or boiled; and I make no doubt that it will equally serve in a fricasee, or a ragoust.
+
+I do therefore humbly offer it to publick consideration, that of the hundred and twenty thousand children, already computed, twenty thousand may be reserved for breed, whereof only one fourth part to be males; which is more than we allow to sheep, black cattle, or swine, and my reason is, that these children are seldom the fruits of marriage, a circumstance not much regarded by our savages, therefore, one male will be sufficient to serve four females. That the remaining hundred thousand may, at a year old, be offered in sale to the persons of quality and fortune, through the kingdom, always advising the mother to let them suck plentifully in the last month, so as to render them plump, and fat for a good table. A child will make two dishes at an entertainment for friends, and when the family dines alone, the fore or hind quarter will make a reasonable dish, and seasoned with a little pepper or salt, will be very good boiled on the fourth day, especially in winter.
+
+I have reckoned upon a medium, that a child just born will weigh 12 pounds, and in a solar year, if tolerably nursed, encreaseth to 28 pounds.
+
+I grant this food will be somewhat dear, and therefore very proper for landlords, who, as they have already devoured most of the parents, seem to have the best title to the children.
+
+I can think of no one objection, that will possibly be raised against this proposal, unless it should be urged, that the number of people will be thereby much lessened in the kingdom. This I freely own, and was indeed one principal design in offering it to the world. I desire the reader will observe, that I calculate my remedy for this one individual Kingdom of Ireland, and for no other that ever was, is, or, I think, ever can be upon Earth. Therefore let no man talk to me of other expedients: Of taxing our absentees at five shillings a pound: Of using neither clothes, nor houshold furniture, except what is of our own growth and manufacture: Of utterly rejecting the materials and instruments that promote foreign luxury: Of curing the expensiveness of pride, vanity, idleness, and gaming in our women: Of introducing a vein of parsimony, prudence and temperance: Of learning to love our country, wherein we differ even from Laplanders, and the inhabitants of Topinamboo: Of quitting our animosities and factions, nor acting any longer like the Jews, who were murdering one another at the very moment their city was taken: Of being a little cautious not to sell our country and consciences for nothing: Of teaching landlords to have at least one degree of mercy towards their tenants. Lastly, of putting a spirit of honesty, industry, and skill into our shopkeepers, who, if a resolution could now be taken to buy only our native goods, would immediately unite to cheat and exact upon us in the price, the measure, and the goodness, nor could ever yet be brought to make one fair proposal of just dealing, though often and earnestly invited to it.
+
+Therefore I repeat, let no man talk to me of these and the like expedients, till he hath at least some glympse of hope, that there will ever be some hearty and sincere attempt to put them into practice.
+
+I profess in the sincerity of my heart, that I have not the least personal interest in endeavouring to promote this necessary work, having no other motive than the publick good of my country, by advancing our trade, providing for infants, relieving the poor, and giving some pleasure to the rich. I have no children, by which I can propose to get a single penny; the youngest being nine years old, and my wife past child-bearing.`
     },
     {
       title: "Politics and the English Language",
@@ -313,6 +683,64 @@ When the doctors came they said she had died of heart disease--of the joy that k
   ],
 };
 
+let libraryData = LOCAL_DATA;
+
+const fetchLibrary = async () => {
+  if (!db) return; // Fallback to local
+  
+  try {
+    const querySnapshot = await getDocs(collection(db, "library"));
+    if (querySnapshot.empty) return;
+
+    const fetchedMap = { poems: [], essays: [], stories: [] };
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      // Heuristic mapping
+      let type = "stories";
+      if (data.category === "Poetry" || data.category === "Poem") type = "poems";
+      else if (data.category === "Essay") type = "essays";
+      
+      fetchedMap[type].push(data);
+    });
+
+    // Combine and deduplicate (prefer fetched version with text over local version)
+    const mergeLists = (local, fetched) => {
+      const combined = [...fetched];
+      const fetchedTitles = new Set(fetched.map(i => i.title));
+      
+      // Map local titles to the fetched book titles that contain them
+      // This prevents duplicates where we have a single item locally but the full book in DB
+      const SUPPRESS_MAP = {
+        "Self-Reliance": "Essays — First Series",
+        "Civil Disobedience": "On the Duty of Civil Disobedience",
+        "The Road Not Taken": "Mountain Interval",
+        "The Gift of the Magi": "The Four Million"
+      };
+      
+      // Only add local items if their title is NOT in the fetched list
+      local.forEach(item => {
+        if (fetchedTitles.has(item.title)) return;
+        
+        // If the containing book is present, suppress the local single item
+        if (SUPPRESS_MAP[item.title] && fetchedTitles.has(SUPPRESS_MAP[item.title])) return;
+
+        combined.push(item);
+      });
+      return combined;
+    };
+
+    if (fetchedMap.poems.length) libraryData.poems = mergeLists(LOCAL_DATA.poems, fetchedMap.poems);
+    if (fetchedMap.essays.length) libraryData.essays = mergeLists(LOCAL_DATA.essays, fetchedMap.essays);
+    if (fetchedMap.stories.length) libraryData.stories = mergeLists(LOCAL_DATA.stories, fetchedMap.stories);
+    
+    console.log("Library loaded from Firestore.", libraryData);
+  } catch (error) {
+    console.error("Error fetching library:", error);
+  }
+};
+
+
 const STORAGE_KEY = "rb-daily-quest-v3";
 const ARCHIVE_KEY = "rb-daily-quest-archive-v3";
 const READ_KEY = "rb-daily-quest-read-history-v3";
@@ -405,9 +833,9 @@ const createEntry = (dateKey) => {
   const random = mulberry32(seed);
   return {
     date: dateKey,
-    poem: pickRandom(DATA.poems, random),
-    story: pickRandom(DATA.stories, random),
-    essay: pickRandom(DATA.essays, random),
+    poem: pickRandom(libraryData.poems, random),
+    story: pickRandom(libraryData.stories, random),
+    essay: pickRandom(libraryData.essays, random),
   };
 };
 
@@ -710,7 +1138,8 @@ const showReader = (entry, category) => {
   readerNextNav.append(homeBtn);
 };
 
-const init = () => {
+const init = async () => {
+  await fetchLibrary();
   const { today, archive } = ensureTodayEntry();
   
   const params = new URLSearchParams(window.location.search);

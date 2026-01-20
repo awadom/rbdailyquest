@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment variables and secrets
+.env
+serviceAccountKey.json
+**/serviceAccountKey.json
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
