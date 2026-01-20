@@ -61,18 +61,13 @@ const LOCAL_DATA = {
 let libraryData = LOCAL_DATA;
 
 const fetchLibrary = async () => {
-  const statusEl = document.getElementById("db-status");
-  if (!db) {
-    if (statusEl) statusEl.textContent = "● Offline (Config Missing)";
-    return;
-  }
+  if (!db) return;
   
   try {
     // 1. Fetch Stats/Counts
     const statsSnap = await getDoc(doc(db, "meta", "stats"));
     if (!statsSnap.exists()) {
       console.warn("No stats found in DB. Run migration or population script.");
-      if (statusEl) statusEl.textContent = "● DB Empty";
       return;
     }
     const counts = statsSnap.data();
@@ -104,18 +99,8 @@ const fetchLibrary = async () => {
     if (essaySnap.exists()) libraryData.essays = [essaySnap.data()];
     
     console.log("Values loaded via Secure Random Indexing.");
-    if (statusEl) {
-        statusEl.textContent = "● Connected: " + (counts.poems + counts.stories + counts.essays) + " items";
-        statusEl.style.color = "var(--success)";
-    }
   } catch (error) {
     console.error("Error fetching library:", error);
-    if (statusEl) {
-        // Show specific error code if available, otherwise message
-        const splitMsg = error.message ? error.message.split(" (")[0] : "Unknown Error";
-        statusEl.textContent = `● Failed: ${error.code || "Network"} (${splitMsg})`;
-        statusEl.style.color = "var(--error)";
-    }
     toastMessage("Using offline backup library");
   }
 };
@@ -790,16 +775,6 @@ const init = async () => {
     siteHeader.classList.remove("hidden");
     window.scrollTo(0, 0);
   });
-
-  const resetBtn = document.getElementById("reset-app-btn");
-  if (resetBtn) {
-      resetBtn.addEventListener("click", () => {
-          if (confirm("Reset app data? This wipes reading history and cache.")) {
-              localStorage.clear();
-              window.location.reload();
-          }
-      });
-  }
 };
 
 init();
