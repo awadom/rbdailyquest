@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // TODO: Replace with your actual Firebase project configuration
 // Get this from: Firebase Console -> Project Overview -> Project Settings -> General -> "Your apps"
@@ -689,52 +689,41 @@ const fetchLibrary = async () => {
   if (!db) return; // Fallback to local
   
   try {
-    const querySnapshot = await getDocs(collection(db, "library"));
-    if (querySnapshot.empty) return;
+    // 1. Fetch Stats/Counts
+    const statsSnap = await getDoc(doc(db, "meta", "stats"));
+    if (!statsSnap.exists()) {
+      console.warn("No stats found in DB. Run migration or population script.");
+      return;
+    }
+    const counts = statsSnap.data();
 
-    const fetchedMap = { poems: [], essays: [], stories: [] };
+    // 2. Calculate IDs based on today's Global Seed
+    // We use a predefined seed so everyone gets the same "Random" books today
+    const seed = hashSeed(isoDate(new Date())); 
+    const random = mulberry32(seed);
+
+    // Pick a random index for each category
+    // (Math.floor(random() * total)) ensure we stay in bounds
+    const idxPoem = Math.floor(random() * counts.poems); 
+    const idxStory = Math.floor(random() * counts.stories); 
+    const idxEssay = Math.floor(random() * counts.essays);
+
+    console.log(`Fetching Daily Layout: Poem #${idxPoem}, Story #${idxStory}, Essay #${idxEssay}`);
+
+    // 3. Fetch ONLY the target documents (Security & Performance)
+    // IDs are formatted like 'poems-5', 'stories-12'
+    const [poemSnap, storySnap, essaySnap] = await Promise.all([
+      getDoc(doc(db, "library", `poems-${idxPoem}`)),
+      getDoc(doc(db, "library", `stories-${idxStory}`)),
+      getDoc(doc(db, "library", `essays-${idxEssay}`))
+    ]);
+
+    // 4. Update Library Data with just these items
+    if (poemSnap.exists()) libraryData.poems = [poemSnap.data()];
+    if (storySnap.exists()) libraryData.stories = [storySnap.data()];
+    if (essaySnap.exists()) libraryData.essays = [essaySnap.data()];
     
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      // Heuristic mapping
-      let type = "stories";
-      if (data.category === "Poetry" || data.category === "Poem") type = "poems";
-      else if (data.category === "Essay") type = "essays";
-      
-      fetchedMap[type].push(data);
-    });
-
-    // Combine and deduplicate (prefer fetched version with text over local version)
-    const mergeLists = (local, fetched) => {
-      const combined = [...fetched];
-      const fetchedTitles = new Set(fetched.map(i => i.title));
-      
-      // Map local titles to the fetched book titles that contain them
-      // This prevents duplicates where we have a single item locally but the full book in DB
-      const SUPPRESS_MAP = {
-        "Self-Reliance": "Essays — First Series",
-        "Civil Disobedience": "On the Duty of Civil Disobedience",
-        "The Road Not Taken": "Mountain Interval",
-        "The Gift of the Magi": "The Four Million"
-      };
-      
-      // Only add local items if their title is NOT in the fetched list
-      local.forEach(item => {
-        if (fetchedTitles.has(item.title)) return;
-        
-        // If the containing book is present, suppress the local single item
-        if (SUPPRESS_MAP[item.title] && fetchedTitles.has(SUPPRESS_MAP[item.title])) return;
-
-        combined.push(item);
-      });
-      return combined;
-    };
-
-    if (fetchedMap.poems.length) libraryData.poems = mergeLists(LOCAL_DATA.poems, fetchedMap.poems);
-    if (fetchedMap.essays.length) libraryData.essays = mergeLists(LOCAL_DATA.essays, fetchedMap.essays);
-    if (fetchedMap.stories.length) libraryData.stories = mergeLists(LOCAL_DATA.stories, fetchedMap.stories);
-    
-    console.log("Library loaded from Firestore.", libraryData);
+    console.log("Values loaded via Secure Random Indexing.");
   } catch (error) {
     console.error("Error fetching library:", error);
   }

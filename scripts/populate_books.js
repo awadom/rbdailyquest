@@ -29,7 +29,15 @@ const CATEGORY_MAP = {
     'Essay': ['1080', '71', '14036', '2944'] 
 };
 
+const APP_CATEGORY_MAP = {
+    'Poetry': 'poems',
+    'Fiction': 'stories',
+    'Essay': 'essays'
+};
+
 const DEFAULT_CATEGORY = "Essay"; // Fallback
+
+let globalStats = { poems: 0, stories: 0, essays: 0 };
 
 // Initialize Firebase
 if (!fs.existsSync(SERVICE_ACCOUNT_KEY_PATH)) {
@@ -47,6 +55,23 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+async function loadStats() {
+    try {
+        const doc = await db.collection('meta').doc('stats').get();
+        if (doc.exists) {
+            globalStats = doc.data();
+            console.log("Loaded stats:", globalStats);
+        }
+    } catch (e) {
+        console.warn("Could not load stats, using defaults.");
+    }
+}
+
+async function saveStats() {
+    await db.collection('meta').doc('stats').set(globalStats);
+    console.log("Updated stats:", globalStats);
+}
+
 async function fetchMetadata(id) {
     try {
         const response = await axios.get(`https://gutendex.com/books/${id}`);
@@ -56,6 +81,7 @@ async function fetchMetadata(id) {
         return null;
     }
 }
+
 
 async function fetchText(url) {
     try {
@@ -122,33 +148,54 @@ async function processBook(id) {
 
     // 4. Clean Text
     const content = cleanGutenbergText(rawText);
-    const category = determineCategory(id);
+    const categoryLabel = determineCategory(id);
+    const appCategory = APP_CATEGORY_MAP[categoryLabel] || 'essays';
     const authors = meta.authors.map(a => a.name).join(', ');
+
+    // Security Check: Does this Gutenberg ID already exist?
+    // We check by querying the field "gutenbergId"
+    const existing = await db.collection('library').where('gutenbergId', '==', id).get();
+    if (!existing.empty) {
+        console.log(`Skipping ${id} (${meta.title}) - Already in library.`);
+        return;
+    }
     
+    // Determine new ID based on counter
+    const index = globalStats[appCategory];
+    const newId = `${appCategory}-${index}`;
+
     // 5. Create Record
     const record = {
+        id: newId,
+        index: index,
         title: meta.title,
         author: authors,
-        year: meta.copyright === false ? "Public Domain" : "Unknown", // Gutendex doesn't always have year
+        year: meta.copyright === false ? "Public Domain" : "Unknown", 
         source: "Project Gutenberg",
         url: `https://www.gutenberg.org/ebooks/${id}`,
-        category: category,
+        category: categoryLabel,
+        appCategory: appCategory,
         gutenbergId: id,
         text: content,
         dateAdded: admin.firestore.FieldValue.serverTimestamp()
     };
 
     // 6. Upload
-    // We add it to a 'library' collection
-    await db.collection('library').doc(id.toString()).set(record);
-    console.log(`✅ Saved "${meta.title}" to Firestore.`);
+    await db.collection('library').doc(newId).set(record);
+    
+    // 7. Increment Stats
+    globalStats[appCategory]++;
+    
+    console.log(`✅ Saved "${meta.title}" as ${newId}`);
 }
 
 async function main() {
+    await loadStats();
     console.log("Starting population...");
     for (const id of BOOKS_TO_FETCH) {
         await processBook(id);
     }
+    await saveStats();
     console.log("Done.");
 }
 

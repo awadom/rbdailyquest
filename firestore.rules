@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Secure: Users can read stats to know the count
+    match /meta/stats {
+      allow get;
+    }
+
+    // Secure: Users can read a SPECIFIC book if they know the ID
+    // but they CANNOT list all books (allow list: false is default)
+    match /library/{bookId} {
+      allow get: if true;
+      allow list: if false; 
+    }
+  }
+}
