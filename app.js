@@ -127,6 +127,10 @@ let currentReadHistory = new Set();
 
 // Initial local load
 try {
+    const local = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+    local.forEach(url => currentReadHistory.add(url));
+} catch (e) { }
+
 // --- AUDIO ENGINE ---
 const synth = window.speechSynthesis;
 let voices = [];
@@ -1256,7 +1260,7 @@ const init = async () => {
       }
     });
   }
-}} catch (e) { console.warn("App initialization error", e); }; // Added catch block to fix try-catch mismatch
+}; // Ends init
 
 const getAuthErrorMessage = (code) => {
     switch (code) {
