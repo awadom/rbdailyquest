@@ -112,9 +112,18 @@ async function processBook(book, category) {
     const content = cleanGutenbergText(rawText);
     
     // Basic validation (arbitrary length check to avoid empty files)
-    if (content.length < 500) return false;
+    if (content.length < 1000) return false;
 
-    // Firestore Size Check (Max 1MB ~ 1,000,000 bytes). Secure limit at 900KB.
+    // Length Check: Limit to ~15k words (75,000 chars) to ensure "Daily" readability
+    // "Essays — First Series" was ~400k chars. "Self-Reliance" is ~30k.
+    const MAX_CHAR_LENGTH = 75000; 
+    
+    if (content.length > MAX_CHAR_LENGTH) {
+        console.warn(`⚠️ Skipping ${book.title} (ID: ${book.id}) - Too long for a daily reading (${(content.length / 1000).toFixed(1)}k chars). Limit: ${MAX_CHAR_LENGTH/1000}k.`);
+        return false;
+    }
+
+    // Firestore Size Check (Backup safety for absolute database limits)
     const sizeInBytes = Buffer.byteLength(content, 'utf8');
     if (sizeInBytes > 900000) {
         console.warn(`⚠️ Skipping ${book.title} (ID: ${book.id}) - Too large for Firestore (${(sizeInBytes / 1024 / 1024).toFixed(2)} MB)`);

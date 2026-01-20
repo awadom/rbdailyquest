@@ -288,8 +288,19 @@ const hydrateEntry = (entry) => {
   return newEntry;
 };
 
-const formatReaderText = (text) => 
-  text.split(/\n\s*\n/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+const formatReaderText = (text, category) => {
+  // Split into paragraphs (double newline), robust for \r\n
+  const paragraphs = text.split(/\r?\n\s*\r?\n/);
+  
+  return paragraphs.map(p => {
+    // For Poems: Preserve line breaks explicitly
+    if (category === 'poem') {
+      return `<p>${p.replace(/\r?\n/g, "<br>")}</p>`;
+    }
+    // For Prose: Treat single newlines as spaces to allow reflow
+    return `<p>${p.replace(/\r?\n/g, " ")}</p>`;
+  }).join("");
+};
 
 const buildCard = (label, item, dateKey) => {
   const card = document.createElement("article");
@@ -515,7 +526,9 @@ const showReader = (entry, category) => {
   readerSource.textContent = item.source || "Source";
   readerSource.href = item.url;
   
-  readerText.innerHTML = item.text ? formatReaderText(item.text) : "<p>Text not available.</p>";
+  // Set content class based on type for CSS styling
+  readerText.className = "content-body " + (category === "poem" ? "poem-text" : "prose-text");
+  readerText.innerHTML = item.text ? formatReaderText(item.text, category) : "<p>Text not available.</p>";
 
   // Populate Bottom Navigation
   readerNextNav.innerHTML = "";

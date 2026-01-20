@@ -305,18 +305,44 @@ main {
   display: none;
 }
 
+/* Base Text Styling */
 .content-body {
   font-family: "Literata", serif;
-  font-size: 1.1rem;
   line-height: 1.8;
   color: #2d2a26;
-  white-space: pre-wrap; /* Preserves poem formatting */
   max-width: 65ch;
   margin-bottom: 2rem;
 }
 
-.content-body p {
-  margin-bottom: 1rem;
+/* Prose (Stories & Essays) */
+.prose-text {
+  font-size: 1.25rem; /* Larger for readability */
+  text-align: left;
+}
+
+.prose-text p {
+  margin-bottom: 1.5rem;
+  text-indent: 0; /* Modern style: spacing > indentation */
+  /* text-align: justify; Optional, but often causes jagged gaps on web */
+}
+
+/* Poetry */
+.poem-text {
+  font-size: 1.15rem; /* Slightly smaller to fit lines */
+  white-space: normal; /* We handle breaks via <br> now */
+  /* Center the block of text, but align text left */
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
+}
+
+.poem-text p {
+  margin-bottom: 2rem;
+  text-align: left; /* Keep left alignment for verse */
+  width: 100%;
+  max-width: 50ch; /* Constrain poem widths */
+  padding-left: 1rem; /* Visual offset */
+  border-left: 1px solid transparent; /* Alignment guide if needed */
 }
 
 @keyframes slideDown {
@@ -484,16 +510,7 @@ main {
   color: var(--accent-strong);
 }
 
-.reader-content .content-body {
-  font-family: "Literata", serif;
-  font-size: 1.25rem;
-  line-height: 1.8;
-  color: var(--ink);
-}
-
-.reader-content .content-body p {
-  margin-bottom: 1.5rem;
-}
+/* Specific overrides handled by .prose-text and .poem-text now */
 
 .reader-footer {
   margin-top: 4rem;

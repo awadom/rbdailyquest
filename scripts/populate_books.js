@@ -148,6 +148,14 @@ async function processBook(id) {
 
     // 4. Clean Text
     const content = cleanGutenbergText(rawText);
+
+    // Length Check
+    const MAX_CHAR_LENGTH = 100000; // Slightly higher limit for manual adds, but still blocked from huge collections
+    if (content.length > MAX_CHAR_LENGTH) {
+        console.warn(`⚠️ Skipping ${id} (${meta.title}) - Content too long (${(content.length/1000).toFixed(1)}k chars).`);
+        return;
+    }
+
     const categoryLabel = determineCategory(id);
     const appCategory = APP_CATEGORY_MAP[categoryLabel] || 'essays';
     const authors = meta.authors.map(a => a.name).join(', ');
