@@ -288,9 +288,70 @@ const hydrateEntry = (entry) => {
   return newEntry;
 };
 
-const formatReaderText = (text, category) => {
+// --- TEXT CLEANING INFRASTRUCTURE ---
+
+const cleanContent = (text, title, category) => {
+  if (!text) return "";
+  let clean = text;
+
+  // 1. Remove common Project Gutenberg artifacts
+  clean = clean.replace(/\[Illustration(:.*?)?\]/gi, ""); // Remove [Illustration] tags
+  clean = clean.replace(/(ISBN|LBM) [\d- ]+/g, ""); // Remove ISBNs
+  clean = clean.replace(/All rights reserved\..*/gi, "");
+  
+  // 2. Remove "End of the Project Gutenberg..." if it slipped through
+  const footerMarker = /\*\*\*.*?END OF.*?PROJECT GUTENBERG.*?\*\*\*/i;
+  clean = clean.split(footerMarker)[0];
+
+  // 3. Smart Preamble Stripping (Specifically for Poems/Short works)
+  // If we identify an "Introduction" or "Preface" section, attempts to jump past it.
+  const introPattern = /\n(INTRODUCTION|PREFACE|FOREWORD)\b/i;
+  const matchIntro = clean.match(introPattern);
+  
+  if (matchIntro) {
+     // If there is an introduction, we look for the Title again occurring AFTER the introduction.
+     // This is common: [Title] -> [Introduction] -> [Title] -> [Actual Text]
+     
+     // Normalize title for search (remove punctuation, lower case)
+     const simpleTitle = title.split(":")[0].replace(/[^\w\s]/g, "").trim().toLowerCase();
+     
+     // Get text AFTER the introduction header
+     const postIntroText = clean.substring(matchIntro.index + matchIntro[0].length);
+     
+     // Look for the title line in the post-intro text
+     const lines = postIntroText.split('\n');
+     let foundStart = -1;
+     
+     for (let i = 0; i < lines.length; i++) {
+        // loose match line against title
+        const lineSimple = lines[i].replace(/[^\w\s]/g, "").trim().toLowerCase();
+        if (lineSimple.includes(simpleTitle) && lineSimple.length < 100) {
+            foundStart = i;
+            break; 
+        }
+     }
+
+     if (foundStart !== -1) {
+         // Reconstruct the text starting from the found title line
+         // We add matchIntro.index back conceptually, but we are working with the slice
+         // Ideally, we just take the substring from the found line index.
+         // Let's effectively slice the array.
+         const startOffset = matchIntro.index + matchIntro[0].length;
+         // We need to validly map the line index back to string index or just join the lines.
+         // Joining lines is safer.
+         clean = lines.slice(foundStart + 1).join('\n'); // Start content AFTER the title repetition
+     }
+  }
+
+  return clean.trim();
+};
+
+const formatReaderText = (text, category, title) => {
+  // 0. Pre-clean the text using heuristics
+  const cleanedText = cleanContent(text, title, category);
+
   // Split into paragraphs (double newline), robust for \r\n
-  const paragraphs = text.split(/\r?\n\s*\r?\n/);
+  const paragraphs = cleanedText.split(/\r?\n\s*\r?\n/);
   
   return paragraphs.map(p => {
     // For Poems: Preserve line breaks explicitly
@@ -528,7 +589,7 @@ const showReader = (entry, category) => {
   
   // Set content class based on type for CSS styling
   readerText.className = "content-body " + (category === "poem" ? "poem-text" : "prose-text");
-  readerText.innerHTML = item.text ? formatReaderText(item.text, category) : "<p>Text not available.</p>";
+  readerText.innerHTML = item.text ? formatReaderText(item.text, category, item.title) : "<p>Text not available.</p>";
 
   // Populate Bottom Navigation
   readerNextNav.innerHTML = "";
