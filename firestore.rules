@@ -4,7 +4,7 @@ service cloud.firestore {
     
     // Secure: Users can read stats to know the count
     match /meta/stats {
-      allow get;
+      allow get: if true;
     }
 
     // Secure: Users can read a SPECIFIC book if they know the ID

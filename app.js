@@ -111,7 +111,9 @@ const fetchLibrary = async () => {
   } catch (error) {
     console.error("Error fetching library:", error);
     if (statusEl) {
-        statusEl.textContent = "● Connection Failed";
+        // Show specific error code if available, otherwise message
+        const splitMsg = error.message ? error.message.split(" (")[0] : "Unknown Error";
+        statusEl.textContent = `● Failed: ${error.code || "Network"} (${splitMsg})`;
         statusEl.style.color = "var(--error)";
     }
     toastMessage("Using offline backup library");
@@ -276,6 +278,10 @@ const hydrateEntry = (entry) => {
       }
 
       if (match) {
+          // Preserve existing note if the new one is missing
+          if (!match.note && entry[key].note) {
+              match.note = entry[key].note;
+          }
           newEntry[key] = match;
       }
   });
@@ -291,7 +297,19 @@ const buildCard = (label, item, dateKey) => {
 
   const readHistory = loadReadHistory();
   const isRead = readHistory.has(item.url);
-  const hasFullText = item.year < 1929 && item.text;
+  // Robust check for full text availability
+  // Handles numeric year (1916) or string year ("Public Domain")
+  // Treat anything effectively 'old' or unmarked (likely PD) as readable if it has text.
+  let isPD = false;
+  if (typeof item.year === 'number') {
+      isPD = item.year < 1929;
+  } else if (typeof item.year === 'string') {
+      isPD = item.year === "Public Domain" || item.year === "Unknown";
+  } else {
+      isPD = true; // Fallback
+  }
+  
+  const hasFullText = isPD && item.text && item.text.length > 100;
 
   // Map label to data key category
   const categoryMap = { "Poem": "poem", "Short Story": "story", "Essay": "essay" };
@@ -312,7 +330,7 @@ const buildCard = (label, item, dateKey) => {
       <span class="tag">${label}</span>
       <h3>${item.title}</h3>
       <p class="byline">${item.author} (${item.year})</p>
-      <p>${item.note}</p>
+      <p>${item.note || ""}</p>
       <span class="read-btn ${isRead ? "read" : ""}">
         ${isRead ? "Read \u2713" : (hasFullText ? "Read Now" : `Read from ${item.source} &rarr;`)}
       </span>
