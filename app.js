@@ -713,21 +713,33 @@ const showReader = (entry, category) => {
   categories.forEach(cat => {
     if (cat === category) return; // Skip current
     
-    // Check if item exists and has text (simple check, or just link to it?)
-    // If it's internal text, we can link directly.
-    // If external, we can still show it but it will open external link?
-    // User requested "options like 'poem' 'short story' 'essay'".
-    // We should treat them like the cards do.
-    
     const catItem = entry[cat];
     const catLabel = labelMap[cat];
     if (!catItem) return;
 
     const btn = document.createElement("button");
     btn.className = "next-nav-btn";
-    btn.textContent = `Read ${catLabel}`;
     
-    const hasFullText = catItem.year < 1929 && catItem.text;
+    // Check Read Status
+    const history = loadReadHistory();
+    const isRead = history.has(catItem.url);
+    if (isRead) {
+        btn.classList.add("read");
+        btn.textContent = `${catLabel} \u2713`;
+    } else {
+        btn.textContent = `Read ${catLabel}`;
+    }
+    
+    // Robust Full Text Check (Same as card logic)
+    let isPD = false;
+    if (typeof catItem.year === 'number') {
+        isPD = catItem.year < 1929;
+    } else if (typeof catItem.year === 'string') {
+        isPD = catItem.year === "Public Domain" || catItem.year === "Unknown";
+    } else {
+        isPD = true; // Fallback
+    }
+    const hasFullText = isPD && catItem.text && catItem.text.length > 100;
 
     btn.addEventListener("click", () => {
        if (hasFullText) {
@@ -745,6 +757,10 @@ const showReader = (entry, category) => {
          const readHistory = loadReadHistory();
          readHistory.add(catItem.url);
          saveReadHistory(readHistory);
+         
+         // Update UI immediately for this button
+         btn.classList.add("read");
+         btn.textContent = `${catLabel} \u2713`;
        }
     });
     

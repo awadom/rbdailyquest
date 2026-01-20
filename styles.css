@@ -780,6 +780,18 @@ main {
   transform: translateY(-2px);
 }
 
+.next-nav-btn.read {
+  background: #e3e8e1;
+  color: #4a5c4e;
+  border-color: #c8d1c5;
+}
+
+.next-nav-btn.read:hover {
+  background: #5a7060;
+  color: white;
+  border-color: #5a7060;
+}
+
 .next-nav-btn.home-btn {
   background: transparent;
   border-color: transparent;
