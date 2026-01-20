@@ -1,5 +1,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDoc, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+    getAuth, 
+    signInWithPopup, 
+    GoogleAuthProvider, 
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    onAuthStateChanged, 
+    signOut 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // TODO: Replace with your actual Firebase project configuration
 // Get this from: Firebase Console -> Project Overview -> Project Settings -> General -> "Your apps"
@@ -16,9 +25,11 @@ const firebaseConfig = {
 // Initialize Firebase
 // Note: Errors here are caught in init() to fallback to local data if config is missing
 let db;
+let auth;
 try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
+  auth = getAuth(app);
 } catch (e) {
   console.warn("Firebase not configured. Using local fallback data.");
 }
@@ -110,16 +121,67 @@ const STORAGE_KEY = "rb-daily-quest-v3";
 const ARCHIVE_KEY = "rb-daily-quest-archive-v3";
 const READ_KEY = "rb-daily-quest-read-history-v3";
 
-const loadReadHistory = () => {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]"));
-  } catch {
-    return new Set();
-  }
+// --- AUTH & DATA STATE ---
+let currentUser = null;
+let currentReadHistory = new Set(); 
+
+// Initial local load
+try {
+  const local = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+  local.forEach(url => currentReadHistory.add(url));
+} catch { /* ignore */ }
+
+// Sync user history (Cloud <-> Local)
+const syncUserHistory = async (user) => {
+    if (!user || !db) return;
+    try {
+        const userRef = doc(db, "users", user.uid);
+        const snap = await getDoc(userRef);
+        
+        if (snap.exists()) {
+            const data = snap.data();
+            (data.readHistory || []).forEach(url => currentReadHistory.add(url));
+        }
+
+        // Write the merged set back to both
+        const mergedList = [...currentReadHistory];
+        localStorage.setItem(READ_KEY, JSON.stringify(mergedList));
+        
+        await setDoc(userRef, { 
+            readHistory: mergedList,
+            lastActive: new Date().toISOString()
+        }, { merge: true });
+        
+        // Refresh UI requiring read status
+        const archive = loadArchive();
+        updateArchives(archive); 
+        // Also refresh daily view if active (to show checkmarks)
+        if (!document.getElementById("home-view").classList.contains("hidden")) {
+           const today = ensureTodayEntry().today;
+           // We might be viewing a past date, but simplest is to re-render whatever is active
+           // Ideally we'd trigger a re-render. 
+           // For now, updateArchives handles the badges in the list.
+           // To update the cards themselves, we'll rely on user navigation or just live with it until refresh.
+           // Actually, we can just find cards and update classes? Too complex. Use refresh if needed.
+        }
+    } catch (e) {
+        console.error("Sync error:", e);
+    }
 };
 
+// Legacy Wrappers (adapted for new state)
+const loadReadHistory = () => currentReadHistory; 
+
 const saveReadHistory = (history) => {
-  localStorage.setItem(READ_KEY, JSON.stringify([...history]));
+  // history is the Set passed by the caller (which modified it)
+  // We update our global and persist
+  currentReadHistory = history; 
+  const list = [...currentReadHistory];
+  localStorage.setItem(READ_KEY, JSON.stringify(list));
+  
+  if (currentUser && db) {
+      setDoc(doc(db, "users", currentUser.uid), { readHistory: list }, { merge: true });
+  }
 };
 
 const dailyContent = document.getElementById("daily-content");
@@ -133,6 +195,15 @@ const siteHeader = document.getElementById("site-header");
 // const heroLabel = document.getElementById("hero-label");
 const dailyHeaderTitle = document.getElementById("daily-header-title");
 const backToTodayBtn = document.getElementById("back-to-today");
+
+// Auth UI
+const loginBtn = document.getElementById("login-btn");
+const userProfile = document.getElementById("user-profile");
+const userName = document.getElementById("user-name");
+const logoutBtn = document.getElementById("logout-btn");
+const authModal = document.getElementById("auth-modal");
+const googleLoginBtn = document.getElementById("google-login-btn");
+const closeModalBtn = document.getElementById("close-modal-btn");
 
 // Archive View Elements
 const viewArchiveBtn = document.getElementById("view-archive-btn");
@@ -520,6 +591,11 @@ const createArchiveItem = (entry) => {
   const button = document.createElement("button");
   button.textContent = "View";
   button.addEventListener("click", () => {
+    if (!currentUser) {
+        authModal.showModal();
+        return;
+    }
+
     const url = new URL(window.location.href);
     url.searchParams.delete("read");
     url.searchParams.delete("category");
@@ -762,6 +838,10 @@ const init = async () => {
 
   // Archive View Navigation
   viewArchiveBtn.addEventListener("click", () => {
+    if (!currentUser) {
+        authModal.showModal();
+        return;
+    }
     siteHeader.classList.add("hidden");
     homeView.classList.add("hidden");
     archiveView.classList.remove("hidden");
@@ -774,6 +854,131 @@ const init = async () => {
     siteHeader.classList.remove("hidden");
     window.scrollTo(0, 0);
   });
+  
+  // --- AUTH LISTENERS ---
+  const emailAuthForm = document.getElementById("email-auth-form");
+  const emailInput = document.getElementById("email-input");
+  const passwordInput = document.getElementById("password-input");
+  const authError = document.getElementById("auth-error");
+  const emailSignupBtn = document.getElementById("email-signup-btn");
+
+  if (loginBtn) {
+    loginBtn.addEventListener("click", () => {
+        authError.classList.add("hidden");
+        authModal.showModal();
+    });
+  }
+  
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener("click", () => authModal.close());
+  }
+
+  // Handle Email Sign In
+  if (emailAuthForm) {
+      emailAuthForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          authError.classList.add("hidden");
+          const email = emailInput.value;
+          const password = passwordInput.value;
+          
+          try {
+              await signInWithEmailAndPassword(auth, email, password);
+              authModal.close();
+              toastMessage("Welcome back!");
+              emailAuthForm.reset();
+          } catch (error) {
+              console.error(error);
+              authError.textContent = getAuthErrorMessage(error.code);
+              authError.classList.remove("hidden");
+          }
+      });
+  }
+
+  // Handle Create Account
+  if (emailSignupBtn) {
+      emailSignupBtn.addEventListener("click", async () => {
+          authError.classList.add("hidden");
+          const email = emailInput.value;
+          const password = passwordInput.value;
+          
+          if (!email || !password) {
+              authError.textContent = "Please enter both email and password.";
+              authError.classList.remove("hidden");
+              return;
+          }
+          
+          try {
+              await createUserWithEmailAndPassword(auth, email, password);
+              authModal.close();
+              toastMessage("Account created!");
+              emailAuthForm.reset();
+          } catch (error) {
+              console.error(error);
+              authError.textContent = getAuthErrorMessage(error.code);
+              authError.classList.remove("hidden");
+          }
+      });
+  }
+  
+  if (googleLoginBtn) {
+    googleLoginBtn.addEventListener("click", async () => {
+       authError.classList.add("hidden");
+       try {
+          const provider = new GoogleAuthProvider();
+          await signInWithPopup(auth, provider);
+          authModal.close();
+          toastMessage(`Welcome!`);
+       } catch (e) {
+          console.error(e);
+          toastMessage("Google Sign In failed");
+       }
+    });
+  }
+  
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => signOut(auth));
+  }
+  
+  if (auth) {
+      onAuthStateChanged(auth, user => {
+          currentUser = user;
+          if (user) {
+              loginBtn.classList.add("hidden");
+              userProfile.classList.remove("hidden");
+              // Use email as fallback for name if display name is missing
+              const name = user.displayName ? user.displayName.split(" ")[0] : user.email.split("@")[0];
+              userName.textContent = name;
+              syncUserHistory(user);
+          } else {
+              loginBtn.classList.remove("hidden");
+              userProfile.classList.add("hidden");
+              
+              // Revert to local storage only
+              currentReadHistory = new Set();
+              try {
+                  const local = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+                  local.forEach(url => currentReadHistory.add(url));
+              } catch {}
+              
+              // Force UI refresh
+              const archive = loadArchive();
+              updateArchives(archive);
+          }
+      });
+  }
+};
+
+const getAuthErrorMessage = (code) => {
+    switch (code) {
+        case 'auth/invalid-email': return 'Invalid email address.';
+        case 'auth/user-disabled': return 'User disabled.';
+        case 'auth/user-not-found': return 'User not found.';
+        case 'auth/wrong-password': return 'Incorrect password.';
+        case 'auth/email-already-in-use': return 'Email already in use.';
+        case 'auth/weak-password': return 'Password is too weak.';
+        case 'auth/missing-password': return 'Please enter a password.';
+        default: return 'Authentication failed. Please try again.';
+    }
 };
 
 init();

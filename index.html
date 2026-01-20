@@ -14,11 +14,20 @@
   </head>
   <body>
     <header id="site-header" class="hero">
-      <div class="container">
-        <h1>Three Daily Classics</h1>
-        <p class="lead">
-          One poem. One story. One essay. Your daily reading ritual from the world's open archives.
-        </p>
+      <div class="container header-content">
+        <div class="header-main">
+            <h1>Three Daily Classics</h1>
+            <p class="lead">
+            One poem. One story. One essay. Your reading ritual.
+            </p>
+        </div>
+        <div class="user-controls">
+            <button id="login-btn" class="ghost-sm">Sign In</button>
+            <div id="user-profile" class="hidden">
+                <span id="user-name">User</span>
+                <button id="logout-btn" class="link-btn-sm">(Log Out)</button>
+            </div>
+        </div>
       </div>
     </header>
 
@@ -110,6 +119,28 @@
     </footer>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <dialog id="auth-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="mb-2">Unlock Your Library</h2>
+            <p class="mb-4 muted">Sign in to save your reading progress and access the complete archive.</p>
+            
+            <form id="email-auth-form" class="auth-group">
+                <input type="email" id="email-input" placeholder="Email address" required class="auth-input">
+                <input type="password" id="password-input" placeholder="Password" required class="auth-input">
+                <p id="auth-error" class="error-msg hidden"></p>
+                <button type="submit" id="email-signin-btn" class="primary-btn full-width">Sign In</button>
+                <button type="button" id="email-signup-btn" class="ghost-btn full-width">Create Account</button>
+            </form>
+
+            <div class="divider"><span>or</span></div>
+
+            <button id="google-login-btn" class="google-btn full-width">
+               Sign in with Google
+            </button>
+            <button id="close-modal-btn" class="link-btn-sm mt-2">Close</button>
+        </div>
+    </dialog>
 
     <script type="module" src="app.js"></script>
   </body>
