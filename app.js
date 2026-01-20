@@ -301,49 +301,86 @@ const cleanContent = (text, title, category) => {
   
   // 2. Remove "End of the Project Gutenberg..." if it slipped through
   const footerMarker = /\*\*\*.*?END OF.*?PROJECT GUTENBERG.*?\*\*\*/i;
+  // Also check for "CONTENTS" list which is often huge and messy
+  // But wait, we might need CONTENTS for anthology detection.
+  // We'll leave it in for the extraction phase, but remove it for standard display.
+
   clean = clean.split(footerMarker)[0];
 
   // 3. Smart Preamble Stripping (Specifically for Poems/Short works)
-  // If we identify an "Introduction" or "Preface" section, attempts to jump past it.
-  const introPattern = /\n(INTRODUCTION|PREFACE|FOREWORD)\b/i;
+  const introPattern = /\n(INTRODUCTION|PREFACE|FOREWORD|PREPARER’S NOTE|CONTENTS)\b/i;
   const matchIntro = clean.match(introPattern);
   
   if (matchIntro) {
-     // If there is an introduction, we look for the Title again occurring AFTER the introduction.
-     // This is common: [Title] -> [Introduction] -> [Title] -> [Actual Text]
-     
-     // Normalize title for search (remove punctuation, lower case)
      const simpleTitle = title.split(":")[0].replace(/[^\w\s]/g, "").trim().toLowerCase();
-     
-     // Get text AFTER the introduction header
      const postIntroText = clean.substring(matchIntro.index + matchIntro[0].length);
      
-     // Look for the title line in the post-intro text
      const lines = postIntroText.split('\n');
      let foundStart = -1;
      
      for (let i = 0; i < lines.length; i++) {
-        // loose match line against title
         const lineSimple = lines[i].replace(/[^\w\s]/g, "").trim().toLowerCase();
-        if (lineSimple.includes(simpleTitle) && lineSimple.length < 100) {
+        // Stricter check: Title must be alone on the line or close to it
+        if (lineSimple.includes(simpleTitle) && lineSimple.length < 100 && lineSimple.length > 5) {
             foundStart = i;
             break; 
         }
      }
 
      if (foundStart !== -1) {
-         // Reconstruct the text starting from the found title line
-         // We add matchIntro.index back conceptually, but we are working with the slice
-         // Ideally, we just take the substring from the found line index.
-         // Let's effectively slice the array.
-         const startOffset = matchIntro.index + matchIntro[0].length;
-         // We need to validly map the line index back to string index or just join the lines.
-         // Joining lines is safer.
-         clean = lines.slice(foundStart + 1).join('\n'); // Start content AFTER the title repetition
+         clean = lines.slice(foundStart + 1).join('\n'); 
      }
   }
 
   return clean.trim();
+};
+
+// --- ANTHOLOGY HANDLING ---
+// Detects if a text is a collection (like Grimms' Fairy Tales) and extracts ONE story
+const extractRandomStory = (fullText, dateKey) => {
+    // 1. Find all "All Caps" lines that look like headers/titles
+    // They must be surrounded by blank lines to be headers.
+    // Regex matches: \n\n TITLE \n\n
+    const chapterRegex = /\n\s*\n\s*([A-Z0-9\s'’-]{3,60})\s*\n\s*\n/g;
+    const matches = [...fullText.matchAll(chapterRegex)];
+
+    // Heuristic: If we find fewer than 3 chapters, it's likely just a normal book with some headers
+    if (matches.length < 3) return null;
+
+    // 2. Build list of candidates
+    const validChapters = [];
+    for (let i = 0; i < matches.length - 1; i++) {
+        const title = matches[i][1].trim();
+        const startIndex = matches[i].index + matches[i][0].length;
+        const endIndex = matches[i+1].index;
+        const content = fullText.substring(startIndex, endIndex);
+
+        // Filter: Must be substantial text (>1500 chars) but not a whole book (<50k)
+        if (content.length > 1500 && content.length < 50000) {
+            validChapters.push({ title: title, text: content.trim() });
+        }
+    }
+    
+    // Check the last one
+    if (matches.length > 0) {
+        const last = matches[matches.length - 1];
+        const content = fullText.substring(last.index + last[0].length);
+        if (content.length > 1500 && content.length < 50000) {
+            validChapters.push({ title: last[1].trim(), text: content.trim() });
+        }
+    }
+
+    if (validChapters.length === 0) return null;
+
+    // 3. Pick one deterministically based on date and "sub-seed"
+    const seed = hashSeed(dateKey + "ANTHOLOGY");
+    const random = mulberry32(seed);
+    const picked = validChapters[Math.floor(random() * validChapters.length)];
+    
+    // Capitalize Title nicely (THE GOLDEN BIRD -> The Golden Bird)
+    picked.title = picked.title.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    
+    return picked;
 };
 
 const formatReaderText = (text, category, title) => {
@@ -580,16 +617,34 @@ const showReader = (entry, category) => {
   window.scrollTo(0, 0);
 
   const labelMap = { "poem": "Poem", "story": "Short Story", "essay": "Essay" };
+  
+  // Clean raw text first
+  let displayText = cleanContent(item.text, item.title, category);
+  let displayTitle = item.title;
+  let displayMeta = `${item.author} (${item.year})`;
+  
+  // Check for Anthology (Sub-Story extraction)
+  // Only applies to Prose (Stories/Essays) with long text
+  if (category !== 'poem' && displayText.length > 30000) {
+      const subStory = extractRandomStory(displayText, entry.date);
+      if (subStory) {
+          console.log(`Anthology Detected: "${item.title}". Extracting "${subStory.title}"`);
+          displayText = subStory.text;
+          displayTitle = subStory.title;
+          displayMeta = `From: ${item.title} by ${item.author}`;
+      }
+  }
+
   readerLabel.textContent = labelMap[category] || "Work";
-  readerTitle.textContent = item.title;
-  readerMeta.textContent = `${item.author} (${item.year})`;
+  readerTitle.textContent = displayTitle;
+  readerMeta.textContent = displayMeta;
   readerNote.textContent = item.note || "";
   readerSource.textContent = item.source || "Source";
   readerSource.href = item.url;
   
   // Set content class based on type for CSS styling
   readerText.className = "content-body " + (category === "poem" ? "poem-text" : "prose-text");
-  readerText.innerHTML = item.text ? formatReaderText(item.text, category, item.title) : "<p>Text not available.</p>";
+  readerText.innerHTML = displayText ? formatReaderText(displayText, category, displayTitle) : "<p>Text not available.</p>";
 
   // Populate Bottom Navigation
   readerNextNav.innerHTML = "";
