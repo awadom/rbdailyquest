@@ -21,12 +21,17 @@
             One poem. One story. One essay. Your reading ritual.
             </p>
         </div>
-        <div class="user-controls">            <button id="audio-settings-btn" class="icon-btn-simple" aria-label="Audio Settings" title="Voice Settings">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-            </button>            <button id="login-btn" class="ghost-sm">Sign In</button>
-            <div id="user-profile" class="hidden">
-                <span id="user-name">User</span>
-                <button id="logout-btn" class="link-btn-sm">(Log Out)</button>
+        <div class="user-controls">
+            <button id="login-btn" class="ghost-sm">Sign In</button>
+            <div id="user-profile" class="hidden user-menu-container">
+                <button id="user-menu-btn" class="ghost-sm user-menu-trigger">
+                    <span id="user-name">User</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div id="user-dropdown" class="dropdown-menu hidden">
+                    <button id="profile-btn" class="dropdown-item">Profile</button>
+                    <button id="logout-btn" class="dropdown-item">Log Out</button>
+                </div>
             </div>
         </div>
       </div>
@@ -112,6 +117,31 @@
            </footer>
          </div>
        </section>
+
+      <section id="profile-view" class="hidden">
+         <button id="profile-back" class="ghost mb-4">&larr; Back to Home</button>
+         <div class="section-header">
+           <div>
+             <h1>Your Profile</h1>
+             <p id="profile-email" class="muted">Loading user data...</p>
+           </div>
+         </div>
+         
+         <div class="profile-stats">
+            <div class="stat-card">
+                <h3>Total Reads</h3>
+                <p id="stat-total-reads" class="stat-value">0</p>
+                <p class="stat-label">Texts completed</p>
+            </div>
+         </div>
+
+         <div class="danger-zone">
+             <h3>Danger Zone</h3>
+             <p>This action is not reversible. Please be certain.</p>
+             <p>All of your reading history, preferences, and account data will be permanently deleted from our servers immediately. You will not be able to recover this account.</p>
+             <button id="delete-account-btn" class="danger-btn">Delete Account</button>
+         </div>
+      </section>
     </main>
 
     <footer class="site-footer">

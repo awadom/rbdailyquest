@@ -7,7 +7,8 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     onAuthStateChanged, 
-    signOut 
+    signOut,
+    deleteUser
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // TODO: Replace with your actual Firebase project configuration
@@ -136,6 +137,7 @@ const synth = window.speechSynthesis;
 let voices = [];
 let currentVoice = null;
 let isPlaying = false;
+let isPaused = false;
 let audioQueue = [];
 let queueIndex = 0;
 
@@ -239,16 +241,33 @@ const splitTextForTTS = (text) => {
     return chunks;
 };
 
+const pauseAudio = () => {
+    // Soft pause: stop speaking but keep queue
+    isPlaying = false;
+    isPaused = true;
+    synth.cancel();
+    updatePlayIcons();
+};
+
+const resumeAudio = () => {
+    if (!audioQueue.length) return;
+    isPlaying = true;
+    isPaused = false;
+    updatePlayIcons();
+    playNextInQueue();
+};
+
 const stopAudio = () => {
     synth.cancel();
     isPlaying = false;
+    isPaused = false; // Hard stop resets pause state
     audioQueue = [];
     document.querySelectorAll(".playing").forEach(el => el.classList.remove("playing"));
     updatePlayIcons();
 };
 
 const updatePlayIcons = () => {
-   const currentItem = isPlaying && audioQueue.length > queueIndex ? audioQueue[queueIndex] : null;
+   const currentItem = (isPlaying || isPaused) && audioQueue.length > queueIndex ? audioQueue[queueIndex] : null;
 
    const speakBtn = document.getElementById("reader-speak-btn");
    if (speakBtn) {
@@ -264,25 +283,40 @@ const updatePlayIcons = () => {
        const stopIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
        const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
        
+       // Show PAUSE icon if playing, PLAY icon if paused or stopped
        playAllBtn.innerHTML = isPlaying ? stopIcon : playIcon;
-       playAllBtn.setAttribute('aria-label', isPlaying ? 'Stop Listening' : 'Listen to Quest');
-       playAllBtn.setAttribute('title', isPlaying ? 'Stop Listening' : 'Listen to Quest');
+       const actionLabel = isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Listen');
+       playAllBtn.setAttribute('aria-label', actionLabel);
+       playAllBtn.setAttribute('title', actionLabel);
    }
 
    // Update Card Buttons
    document.querySelectorAll(".card-play-btn").forEach(btn => {
       const btnTitle = btn.dataset.title;
       // use parentTitle to match reliable identity of the work
-      const isThisPlaying = isPlaying && currentItem && currentItem.parentTitle === btnTitle;
+      // Check if this card is the CURRENT focus of the audio engine (whether playing OR paused)
+      const isThisActive = (isPlaying || isPaused) && currentItem && currentItem.parentTitle === btnTitle;
       
-      const stopIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+      const pauseIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
       const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
       
-      btn.innerHTML = isThisPlaying ? stopIcon : playIcon;
-      btn.setAttribute('aria-label', isThisPlaying ? 'Stop Listening' : 'Listen');
+      // If this card is active:
+      // - If system IS PLAYING, show PAUSE icon (so user can click to pause)
+      // - If system IS PAUSED, show PLAY icon (so user can click to resume)
+      // Wait, if I click play on card while paused, does it validly "resume" that card?
+      // With my click handler logic:
+      // if (isPlaying && matches) -> stopAudio().
+      // I need to update click handler too.
       
-      // Visual flair: dim non-playing cards if one IS playing?
-      // Optional enhancement.
+      if (isThisActive && isPlaying) {
+          btn.innerHTML = pauseIcon;
+          btn.setAttribute('aria-label', 'Pause');
+      } else {
+          // If active but paused, it looks like a Play button. 
+          // If unexpected card, looks like Play button.
+          btn.innerHTML = playIcon;
+          btn.setAttribute('aria-label', 'Listen');
+      }
    });
 };
 
@@ -296,11 +330,14 @@ const playNextInQueue = () => {
     updatePlayIcons();
     
     const item = audioQueue[queueIndex];
+    if (!item) return; // Guard against rapid queue changes
+    
     const utterance = new SpeechSynthesisUtterance(item.text);
     if (currentVoice) utterance.voice = currentVoice;
     utterance.rate = 0.9; // Slightly slower for reading
     
     utterance.onend = () => {
+        if (!isPlaying) return; // Don't proceed if we paused
         queueIndex++;
         playNextInQueue();
     };
@@ -544,6 +581,9 @@ const loginBtn = document.getElementById("login-btn");
 const userProfile = document.getElementById("user-profile");
 const userName = document.getElementById("user-name");
 const logoutBtn = document.getElementById("logout-btn");
+const userMenuBtn = document.getElementById("user-menu-btn");
+const userDropdown = document.getElementById("user-dropdown");
+const profileBtn = document.getElementById("profile-btn");
 const authModal = document.getElementById("auth-modal");
 const googleLoginBtn = document.getElementById("google-login-btn");
 const closeModalBtn = document.getElementById("close-modal-btn");
@@ -552,6 +592,13 @@ const closeModalBtn = document.getElementById("close-modal-btn");
 const viewArchiveBtn = document.getElementById("view-archive-btn");
 const archiveView = document.getElementById("archive-view");
 const archiveBack = document.getElementById("archive-back");
+
+// Profile View Elements
+const profileView = document.getElementById("profile-view");
+const profileBack = document.getElementById("profile-back");
+const profileEmail = document.getElementById("profile-email");
+const statTotalReads = document.getElementById("stat-total-reads");
+const deleteAccountBtn = document.getElementById("delete-account-btn");
 
 // Reader View Elements
 const homeView = document.getElementById("home-view");
@@ -879,8 +926,10 @@ const buildCard = (label, item, dateKey) => {
           e.stopPropagation(); // Don't trigger card link
           e.preventDefault();
           
-          if (isPlaying && audioQueue.length > 0 && audioQueue[0].title === item.title) {
-              stopAudio();
+          if (isPlaying && audioQueue.length > 0 && audioQueue[queueIndex].parentTitle === item.title) {
+              pauseAudio();
+          } else if (isPaused && audioQueue.length > 0 && audioQueue[queueIndex].parentTitle === item.title) {
+              resumeAudio();
           } else {
               playText(item.text, item.title, item.author, label);
           }
@@ -1352,6 +1401,70 @@ const init = async () => {
     });
   }
   
+  if (userMenuBtn && userDropdown) {
+      userMenuBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          userDropdown.classList.toggle("hidden");
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener("click", (e) => {
+          if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+              userDropdown.classList.add("hidden");
+          }
+      });
+  }
+
+  const updateProfileStats = () => {
+    if (statTotalReads) {
+        statTotalReads.textContent = currentReadHistory.size;
+    }
+    if (currentUser && profileEmail) {
+        profileEmail.textContent = currentUser.email;
+    }
+  };
+
+  if (profileBtn) {
+      profileBtn.addEventListener("click", () => {
+          homeView.classList.add("hidden");
+          archiveView.classList.add("hidden");
+          readerView.classList.add("hidden");
+          profileView.classList.remove("hidden");
+          updateProfileStats();
+          userDropdown.classList.add("hidden");
+      });
+  }
+
+  if (profileBack) {
+      profileBack.addEventListener("click", () => {
+          profileView.classList.add("hidden");
+          homeView.classList.remove("hidden");
+      });
+  }
+
+  if (deleteAccountBtn) {
+      deleteAccountBtn.addEventListener("click", async () => {
+        const confirmed = confirm("Are you absolutely sure? This cannot be undone.");
+        if (confirmed) {
+            try {
+                await deleteUser(currentUser);
+                currentReadHistory.clear();
+                localStorage.removeItem(READ_KEY);
+                toastMessage("Account deleted.");
+                profileView.classList.add("hidden");
+                homeView.classList.remove("hidden");
+            } catch(e) {
+                console.error(e);
+                if (e.code === 'auth/requires-recent-login') {
+                     toastMessage("Please log in again to delete your account.");
+                } else {
+                     toastMessage("Error deleting account.");
+                }
+            }
+        }
+      });
+  }
+
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => signOut(auth));
   }
@@ -1388,7 +1501,6 @@ const init = async () => {
 
   // --- AUDIO LISTENERS ---
   const audioModal = document.getElementById("audio-modal");
-  const audioSettingsBtn = document.getElementById("audio-settings-btn");
   const closeAudioBtn = document.getElementById("close-audio-btn");
   const voiceSelect = document.getElementById("voice-select");
   const playAllBtn = document.getElementById("play-all-btn");
@@ -1396,13 +1508,6 @@ const init = async () => {
   const readerSpeakBtn = document.getElementById("reader-speak-btn");
   const readerShareBtn = document.getElementById("reader-share-btn");
 
-  if (audioSettingsBtn) {
-      audioSettingsBtn.addEventListener("click", () => {
-          updateVoiceSelect(); // Refresh list just in case
-          audioModal.showModal();
-      });
-  }
-  
   if (closeAudioBtn) {
       closeAudioBtn.addEventListener("click", () => audioModal.close());
   }
@@ -1444,7 +1549,9 @@ const init = async () => {
       // Logic for playing the full day's quest
       playAllBtn.addEventListener("click", () => {
           if (isPlaying) {
-              stopAudio();
+              pauseAudio();
+          } else if (isPaused && audioQueue.length > 0) {
+              resumeAudio();
           } else {
               // We need the current active entry.
               // We can grab it from `hydrateEntry` cache or assume it's `today` if on home screen.
