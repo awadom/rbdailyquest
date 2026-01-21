@@ -191,49 +191,35 @@ const updateVoiceSelect = () => {
 };
 
 const splitTextForTTS = (text) => {
-    // Limits for reliable TTS across browsers (especially Chrome/Safari)
-    // 200-300 chars is a safe sweet spot to avoid timeouts
-    const MAX_CHUNK_LENGTH = 250; 
+    // Limits for reliable TTS server (Piper often segfaults on very long text)
+    // Reduce chunk size to be safe.
+    const MAX_CHUNK_LENGTH = 500; 
     
     // Quick return if short enough
     if (text.length <= MAX_CHUNK_LENGTH) return [text];
 
     const chunks = [];
     // Split by sentence ending punctuation followed by space or newline
-    // This regex looks for period/exclamation/question mark followed by space/quote/newline
-    const sentenceRegex = /([.?!]["']?)\s+/g;
-    
-    let startIndex = 0;
-    let match;
-    
-    while ((match = sentenceRegex.exec(text)) !== null) {
-        const endIndex = match.index + match[0].length;
-        const chunk = text.substring(startIndex, endIndex);
-        
-        // If adding this sentence exceeds max, push what we have? 
-        // Actually, we want to accumulate sentences until we hit the limit.
-        // But the loop here iterates over *every* sentence.
-        // Let's refine: iterate sentences, accumulate buffer.
-    }
-    
-    // Better simple approach: Split all sentences, then combine.
-    // 1. Split by rough sentence boundaries, keeping delimiters
     const sentences = text.match(/[^.?!]+[.?!]+["']?|[^.?!]+$/g) || [text];
     
     let currentChunk = "";
     
     for (const sentence of sentences) {
-        const potential = currentChunk + (currentChunk ? " " : "") + sentence.trim();
+        const trimmed = sentence.trim();
+        if (!trimmed) continue;
+        
+        const potential = currentChunk + (currentChunk ? " " : "") + trimmed;
         
         if (potential.length > MAX_CHUNK_LENGTH) {
              if (currentChunk) chunks.push(currentChunk);
              
-             // If the single sentence is huge, forced split or just accept it (usually fine if < 500)
-             if (sentence.length > MAX_CHUNK_LENGTH) {
-                 // Fallback: split by comma or just hard char limit
-                 currentChunk = sentence.trim(); // Just take the hit for now, or implement deeper recursion
+             if (trimmed.length > MAX_CHUNK_LENGTH) {
+                 // Hard split if single sentence is too long
+                 const subChunks = trimmed.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, 'g'));
+                 subChunks.forEach(sc => chunks.push(sc));
+                 currentChunk = "";
              } else {
-                 currentChunk = sentence.trim();
+                 currentChunk = trimmed;
              }
         } else {
              currentChunk = potential;
@@ -563,23 +549,24 @@ const playText = (text, title, author, type) => {
     stopAudio();
     isPlaying = true;
     
-    // Instead of chunking small, we take the whole text or large chunks suitable for server
-    // For now, assume server takes the whole text. 
-    // If text is huge, we might still want to chunk, but let's try single file per request first as requested "get that one and play it"
-    
-    const textToSpeak = `${type}. ${title}. By ${author}. ${text}`;
-    
-    // Initiate fetch immediately
-    const audioPromise = fetchAudioForText(textToSpeak);
-    
-    audioQueue = [{
-        text: text,
-        title: title,
-        parentTitle: title,
-        author: author,
-        type: type,
-        audioPromise: audioPromise
-    }];
+    // Chunking to support the server limits
+    const fullText = `${type}. ${title}. By ${author}. ${text}`;
+    const chunks = splitTextForTTS(fullText);
+
+    // Create queue items
+    audioQueue = chunks.map((chunk, index) => {
+        // Trigger fetch immediately
+        const promise = fetchAudioForText(chunk);
+        return {
+            text: chunk,
+            title: index === 0 ? title : null,
+            parentTitle: title,
+            author: author,
+            type: type,
+            audioPromise: promise,
+            isContinuation: index > 0
+        };
+    });
     
     queueIndex = 0;
     updatePlayIcons();
@@ -608,43 +595,43 @@ const playQuest = (entry) => {
         if (sub) essayText = sub.text;
      }
 
-    // Prepare full texts with intros
-    const fullPoem = `Poem. ${p.title}. By ${p.author}. ${poemText}`;
-    const fullStory = `Short Story. ${s.title}. By ${s.author}. ${storyText}`;
-    const fullEssay = `Essay. ${e.title}. By ${e.author}. ${essayText}`;
-    
-    // Initiate fetches for ALL 3 in parallel
-    const pPromise = fetchAudioForText(fullPoem);
-    const sPromise = fetchAudioForText(fullStory);
-    const ePromise = fetchAudioForText(fullEssay);
-    
-    audioQueue = [
-        { 
-            text: poemText, 
-            title: p.title, 
-            parentTitle: p.title, 
-            author: p.author, 
-            type: "Poem", 
-            audioPromise: pPromise 
-        },
-        { 
-            text: storyText, 
-            title: s.title, 
-            parentTitle: s.title, 
-            author: s.author, 
-            type: "Short Story", 
-            audioPromise: sPromise 
-        },
-        { 
-            text: essayText, 
-            title: e.title, 
-            parentTitle: e.title, 
-            author: e.author, 
-            type: "Essay", 
-            audioPromise: ePromise 
-        }
-    ];
+    // Process all into chunks
+    const pIntro = `Poem. ${p.title}. By ${p.author}. ${poemText}`;
+    const sIntro = `Short Story. ${s.title}. By ${s.author}. ${storyText}`;
+    const eIntro = `Essay. ${e.title}. By ${e.author}. ${essayText}`;
 
+    const pChunks = splitTextForTTS(pIntro);
+    const sChunks = splitTextForTTS(sIntro);
+    const eChunks = splitTextForTTS(eIntro);
+    
+    const queuePoem = pChunks.map((c, i) => ({ 
+        text: c, 
+        title: i===0 ? p.title : null, 
+        parentTitle: p.title,
+        author: p.author, 
+        type: "Poem",
+        audioPromise: fetchAudioForText(c) // Trigger fetch
+    }));
+    
+    const queueStory = sChunks.map((c, i) => ({ 
+        text: c, 
+        title: i===0 ? s.title : null, 
+        parentTitle: s.title,
+        author: s.author, 
+        type: "Short Story",
+        audioPromise: fetchAudioForText(c) // Trigger fetch
+    }));
+    
+    const queueEssay = eChunks.map((c, i) => ({ 
+        text: c, 
+        title: i===0 ? e.title : null, 
+        parentTitle: e.title,
+        author: e.author, 
+        type: "Essay",
+        audioPromise: fetchAudioForText(c) // Trigger fetch 
+    }));
+
+    audioQueue = [...queuePoem, ...queueStory, ...queueEssay];
     queueIndex = 0;
     updatePlayIcons();
     playNextInQueue();
