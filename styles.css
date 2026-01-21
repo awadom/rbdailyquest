@@ -969,3 +969,52 @@ main {
 .danger-btn:hover {
     background: #b71c1c;
 }
+
+/* Progress Bar */
+.progress-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background-color: var(--border);
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.progress-container.active {
+    opacity: 1;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--accent);
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+/* Reader View Progress */
+.reader-progress-container {
+    width: 100%;
+    position: fixed; 
+    top: 0; 
+    left: 0;
+    height: 4px;
+    z-index: 1000;
+    background-color: transparent;
+    pointer-events: none;
+}
+.reader-progress-bar {
+    height: 100%;
+    background-color: var(--accent);
+    width: 0%;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.reader-progress-bar.active {
+    opacity: 1;
+}
+

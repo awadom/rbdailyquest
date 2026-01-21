@@ -313,6 +313,15 @@ const stopAudio = () => {
     isPaused = false; // Hard stop resets pause state
     audioQueue = [];
     document.querySelectorAll(".playing").forEach(el => el.classList.remove("playing"));
+    
+    // Reset Progress Bars
+    document.querySelectorAll(".progress-container.active, .reader-progress-bar.active").forEach(el => {
+        el.classList.remove("active");
+    });
+    document.querySelectorAll(".progress-fill, .reader-progress-bar").forEach(el => {
+        el.style.width = "0%";
+    });
+
     updatePlayIcons();
 };
 
@@ -414,6 +423,31 @@ const playNextInQueue = async () => {
 
         const audio = new Audio(audioUrl);
         currentAudio = audio;
+
+        audio.addEventListener('timeupdate', () => {
+            const percent = (audio.currentTime / audio.duration) * 100;
+            if (isNaN(percent)) return;
+
+            // Global Reader Progress
+            const readerBar = document.getElementById("reader-progress-bar");
+            if (readerBar) {
+                readerBar.style.width = `${percent}%`;
+                // Show/Hide handled by active classes logic optionally, or just always show if playing
+                readerBar.classList.add("active");
+                if (percent >= 99.5) readerBar.classList.remove("active");
+            }
+
+            // Card Progress
+            // Find card with data-title matching current item parentTitle
+            if (item.parentTitle) {
+                const cardProgressBar = document.querySelector(`.progress-container[data-title="${item.parentTitle}"]`);
+                if (cardProgressBar) {
+                    cardProgressBar.classList.add("active");
+                    const fill = cardProgressBar.querySelector(".progress-fill");
+                    if (fill) fill.style.width = `${percent}%`;
+                }
+            }
+        });
 
         audio.onended = () => {
             if (!isPlaying) return; 
@@ -1014,6 +1048,9 @@ const buildCard = (label, item, dateKey) => {
             style="position: absolute; top: 1.25rem; right: 1.25rem; z-index: 10;">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
         </button>
+        <div class="progress-container" data-title="${item.title}">
+            <div class="progress-fill"></div>
+        </div>
         ` : ''}
     </div>
   `;
