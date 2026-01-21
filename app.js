@@ -253,12 +253,17 @@ const fetchAudioForText = async (text) => {
     formData.append('text', text);
 
     try {
-        const response = await fetch('http://homeforawad.duckdns.org:8000/tts', {
+        // Adding trailing slash to avoid potential redirects that downgrade POST to GET
+        const response = await fetch('http://homeforawad.duckdns.org:8000/tts/', {
             method: 'POST',
-            body: formData
+            body: formData,
+            mode: 'cors'
         });
 
-        if (!response.ok) throw new Error("Network response was not ok");
+        if (!response.ok) {
+             const errText = await response.text();
+             throw new Error(`Network response was not ok: ${response.status} ${errText}`);
+        }
         
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
