@@ -140,6 +140,9 @@ let isPlaying = false;
 let isPaused = false;
 let audioQueue = [];
 let queueIndex = 0;
+let currentAudio = null;
+let activeFetchController = null;
+const audioCache = new Map(); // Cache map: key(text) -> blobUrl
 
 const loadVoices = () => {
     voices = synth.getVoices();
@@ -241,15 +244,53 @@ const splitTextForTTS = (text) => {
     return chunks;
 };
 
+const fetchAudioForText = async (text) => {
+    if (audioCache.has(text)) {
+        return audioCache.get(text);
+    }
+
+    const formData = new FormData();
+    formData.append('text', text);
+
+    try {
+        const response = await fetch('http://homeforawad.duckdns.org:8000/tts', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) throw new Error("Network response was not ok");
+        
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        audioCache.set(text, url);
+        return url;
+    } catch (e) {
+        console.error("Fetch Audio Error", e);
+        throw e;
+    }
+};
+
 const pauseAudio = () => {
     // Soft pause: stop speaking but keep queue
     isPlaying = false;
     isPaused = true;
-    synth.cancel();
+    if (currentAudio) {
+        currentAudio.pause();
+    }
     updatePlayIcons();
 };
 
 const resumeAudio = () => {
+    // If we have a current audio paused, resume it
+    if (currentAudio && currentAudio.paused && audioQueue.length > 0) {
+        isPlaying = true;
+        isPaused = false;
+        currentAudio.play();
+        updatePlayIcons();
+        return;
+    }
+    
+    // Otherwise fallback to queue logic
     if (!audioQueue.length) return;
     isPlaying = true;
     isPaused = false;
@@ -259,6 +300,15 @@ const resumeAudio = () => {
 
 const stopAudio = () => {
     synth.cancel();
+    if (activeFetchController) {
+        activeFetchController.abort();
+        activeFetchController = null;
+    }
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+    }
     isPlaying = false;
     isPaused = false; // Hard stop resets pause state
     audioQueue = [];
@@ -320,41 +370,69 @@ const updatePlayIcons = () => {
    });
 };
 
-const playNextInQueue = () => {
+const playNextInQueue = async () => {
     if (queueIndex >= audioQueue.length) {
         stopAudio();
         return;
     }
     
-    // Update UI every time we proceed to a new chunk (essential for cross-story transitions)
+    // Update UI every time we proceed to a new chunk
     updatePlayIcons();
     
     const item = audioQueue[queueIndex];
-    if (!item) return; // Guard against rapid queue changes
-    
-    const utterance = new SpeechSynthesisUtterance(item.text);
-    if (currentVoice) utterance.voice = currentVoice;
-    utterance.rate = 0.9; // Slightly slower for reading
-    
-    utterance.onend = () => {
-        if (!isPlaying) return; // Don't proceed if we paused
-        queueIndex++;
-        playNextInQueue();
-    };
-    
-    utterance.onerror = (e) => {
-        console.error("TTS Error", e);
+    if (!item) return; 
+
+    try {
+        let audioUrl = item.audioUrl;
+        
+        // If not pre-calculated or pre-fetched, try the promise
+        if (!audioUrl && item.audioPromise) {
+            try {
+                audioUrl = await item.audioPromise;
+            } catch (err) {
+                console.error("Failed to load audio for item", item.title, err);
+                // Skip to next?
+                queueIndex++;
+                playNextInQueue();
+                return;
+            }
+        }
+        
+        // If still no url (shouldn't happen with promise), playText might be dynamic
+        if (!audioUrl) {
+            // Add identifying intro
+            let textToSpeak = item.text;
+            if (item.title) {
+                textToSpeak = `${item.type}. ${item.title}. By ${item.author}. ${textToSpeak}`;
+            }
+            audioUrl = await fetchAudioForText(textToSpeak);
+        }
+
+        if (!audioUrl) throw new Error("No audio URL available");
+
+        if (!isPlaying) return; // Check if user stopped while waiting
+
+        const audio = new Audio(audioUrl);
+        currentAudio = audio;
+
+        audio.onended = () => {
+            if (!isPlaying) return; 
+            queueIndex++;
+            playNextInQueue();
+        };
+
+        audio.onerror = (e) => {
+            console.error("Audio Playback Error", e);
+            // Try next
+            queueIndex++;
+            playNextInQueue();
+        };
+
+        await audio.play();
+        
+    } catch (e) {
+        console.error("TTS Queue Error", e);
         stopAudio();
-    };
-    
-    // Announce Title first
-    if (item.title) {
-        const titleUtt = new SpeechSynthesisUtterance(`${item.type}. ${item.title}. By ${item.author}.`);
-        if (currentVoice) titleUtt.voice = currentVoice;
-        titleUtt.onend = () => synth.speak(utterance);
-        synth.speak(titleUtt);
-    } else {
-        synth.speak(utterance);
     }
 };
 
@@ -424,6 +502,17 @@ const skipAudio = (direction) => {
     
     if (targetIndex !== -1) {
         synth.cancel(); // Stop current speaking immediately
+        
+        if (activeFetchController) {
+            activeFetchController.abort();
+            activeFetchController = null;
+        }
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+        }
+
         queueIndex = targetIndex;
         // Resume
         playNextInQueue();
@@ -435,15 +524,23 @@ const playText = (text, title, author, type) => {
     stopAudio();
     isPlaying = true;
     
-    const chunks = splitTextForTTS(text);
-    audioQueue = chunks.map((chunk, index) => ({
-        text: chunk,
-        title: index === 0 ? title : null, // Only announce header on first chunk
-        parentTitle: title, // Track identity for all chunks
+    // Instead of chunking small, we take the whole text or large chunks suitable for server
+    // For now, assume server takes the whole text. 
+    // If text is huge, we might still want to chunk, but let's try single file per request first as requested "get that one and play it"
+    
+    const textToSpeak = `${type}. ${title}. By ${author}. ${text}`;
+    
+    // Initiate fetch immediately
+    const audioPromise = fetchAudioForText(textToSpeak);
+    
+    audioQueue = [{
+        text: text,
+        title: title,
+        parentTitle: title,
         author: author,
         type: type,
-        isContinuation: index > 0
-    }));
+        audioPromise: audioPromise
+    }];
     
     queueIndex = 0;
     updatePlayIcons();
@@ -453,60 +550,64 @@ const playText = (text, title, author, type) => {
 const playQuest = (entry) => {
     stopAudio();
     isPlaying = true;
+    
+    toastMessage(`Starting Daily Quest audio...`);
+
     const p = entry.poem;
     const s = entry.story;
     const e = entry.essay;
     
-    // Clean texts
     const poemText = cleanContent(p.text, p.title, 'poem');
-    // For stories/essays, content might be too long. 
-    // Just read clean versions.
     let storyText = cleanContent(s.text, s.title, 'story');
-    // Check anthology
      if (storyText.length > 30000) {
         const sub = extractRandomStory(storyText, entry.date);
         if (sub) storyText = sub.text;
      }
-
     let essayText = cleanContent(e.text, e.title, 'essay');
     if (essayText.length > 30000) {
         const sub = extractRandomStory(essayText, entry.date);
         if (sub) essayText = sub.text;
      }
 
-    // Process all into chunks
-    const pChunks = splitTextForTTS(poemText);
-    const sChunks = splitTextForTTS(storyText);
-    const eChunks = splitTextForTTS(essayText);
+    // Prepare full texts with intros
+    const fullPoem = `Poem. ${p.title}. By ${p.author}. ${poemText}`;
+    const fullStory = `Short Story. ${s.title}. By ${s.author}. ${storyText}`;
+    const fullEssay = `Essay. ${e.title}. By ${e.author}. ${essayText}`;
     
-    const queuePoem = pChunks.map((c, i) => ({ 
-        text: c, 
-        title: i===0 ? p.title : null, 
-        parentTitle: p.title,
-        author: p.author, 
-        type: "Poem" 
-    }));
+    // Initiate fetches for ALL 3 in parallel
+    const pPromise = fetchAudioForText(fullPoem);
+    const sPromise = fetchAudioForText(fullStory);
+    const ePromise = fetchAudioForText(fullEssay);
     
-    const queueStory = sChunks.map((c, i) => ({ 
-        text: c, 
-        title: i===0 ? s.title : null, 
-        parentTitle: s.title,
-        author: s.author, 
-        type: "Short Story" 
-    }));
-    
-    const queueEssay = eChunks.map((c, i) => ({ 
-        text: c, 
-        title: i===0 ? e.title : null, 
-        parentTitle: e.title,
-        author: e.author, 
-        type: "Essay" 
-    }));
+    audioQueue = [
+        { 
+            text: poemText, 
+            title: p.title, 
+            parentTitle: p.title, 
+            author: p.author, 
+            type: "Poem", 
+            audioPromise: pPromise 
+        },
+        { 
+            text: storyText, 
+            title: s.title, 
+            parentTitle: s.title, 
+            author: s.author, 
+            type: "Short Story", 
+            audioPromise: sPromise 
+        },
+        { 
+            text: essayText, 
+            title: e.title, 
+            parentTitle: e.title, 
+            author: e.author, 
+            type: "Essay", 
+            audioPromise: ePromise 
+        }
+    ];
 
-    audioQueue = [...queuePoem, ...queueStory, ...queueEssay];
     queueIndex = 0;
     updatePlayIcons();
-    toastMessage(`Starting Daily Quest audio...`);
     playNextInQueue();
 };
 // --- END AUDIO ENGINE ---
